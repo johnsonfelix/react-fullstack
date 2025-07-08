@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+
+datasource d {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  country   String
+  createdAt DateTime @default(now()) @map(name: "created_at")
+  updatedAt DateTime @updatedAt @map(name: "updated_at")
+}
+
+model User {
+  id               String     @id @default(cuid())
+  username         String     @unique
+  password         String
+  email            String?    @unique
+  type             String
+  profileCompleted Boolean    @default(false)
+  createdAt        DateTime   @default(now()) @map(name: "created_at")
+  updatedAt        DateTime   @updatedAt @map(name: "updated_at")
+
+  supplier         Supplier?  @relation("UserSupplier", fields: [supplierId], references: [id])
+  supplierId       String?    @unique
+
+  @@map(name: "users")
+}
+
+model Supplier {
+  id        String      @id @default(cuid())
+  name      String
+  firstName String?
+  lastName  String?
+  state     String?
+  city      String?
+  zipcode   String?
+  status    String?
+  procurements ProcurementRequest[] @relation("ProcurementRequestSuppliers")
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+
+  user      User?        @relation("UserSupplier")
+  group     Category[]   @relation("SupplierCategories") // many-to-many
+}
+
+model Category {
+  id              String      @id @default(cuid())
+  name            String
+  createdAt       DateTime    @default(now()) @map(name: "created_at")
+  updatedAt       DateTime    @updatedAt @map(name: "updated_at")
+
+  // Self-referencing fields
+  parentCategoryId String?     
+  parentCategory   Category?   @relation("SubCategories", fields: [parentCategoryId], references: [id])
+  subcategories    Category[]  @relation("SubCategories")
+
+  suppliers        Supplier[]  @relation("SupplierCategories")
+}
+
+model Currency {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
+
+model Payment {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
+model Shipping {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
+model Uom {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
+model Urgency {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
+model BRFQ {
+  id                    String   @id @default(uuid())
+  rfqId                 String   @unique
+  title                 String
+  closeDate             DateTime
+  closeTime             DateTime
+  preferredDeliveryTime String?
+  requester             String?
+  shippingAddress       String?
+  paymentProcess        String
+  currency              String
+  shippingType          String?
+  carrier               String?
+  urgency               String?
+  notesToSupplier       String?
+  productSpecification  String?
+  customerCategory      String[]
+  suppliersSelected     String[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  items                 RequestItem[]
+  suppliers             String[]
+
+  attachmentPath        String?
+
+  // ✅ Add this reverse relation
+  quotes                Quote[]  @relation("BRFQToQuotes")
+}
+
+
+
+model RequestItem {
+  id             String   @id @default(uuid())
+  brfqId         String
+  internalPartNo String?
+  manufacturer   String?
+  mfgPartNo      String?
+  description    String
+  uom            String   // store name directly
+  quantity       Int
+
+  brfq           BRFQ     @relation(fields: [brfqId], references: [id], onDelete: Cascade)
+}
+
+model Quote {
+  id               String   @id @default(uuid())
+  supplierQuoteNo  String
+  validFor         String
+  currency         String
+  shipping         String
+  comments         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  rfqId            String
+  supplierId       String
+
+  // ✅ Name the relation explicitly to match BRFQ
+  rfq              BRFQ     @relation("BRFQToQuotes", fields: [rfqId], references: [id])
+  items            QuoteItem[]
+}
+
+model QuoteItem {
+  id             String   @id @default(uuid())
+  quoteId        String
+  quote          Quote    @relation(fields: [quoteId], references: [id])
+
+  supplierPartNo String
+  deliveryDays   String
+  unitPrice      String
+  qty            String
+  uom            String
+  cost           Float
+}
+
+model ProcurementItem {
+  id              String               @id @default(cuid())
+  title           String
+  quantity        Int
+  price           Int?
+  manufacturerPartNo   String?
+  uom             String?
+  procurementId   String
+  procurement     ProcurementRequest   @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+}
+
+model ProcurementRequest {
+  id          String                    @id @default(cuid())
+  title       String
+  description String?
+  requestType String
+  category    String
+  address     String
+  scopeOfWork ScopeOfWorkDeliverable[]
+  status      String                    @default("draft")
+  evaluationSections EvaluationSection[]
+  evaluationDetails Json?
+  items       ProcurementItem[]
+  questions   Question[] 
+  aiQuestions Json?
+  additionalFields Json?
+  suppliers   Supplier[] @relation("ProcurementRequestSuppliers")
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+}
+
+model ScopeOfWorkDeliverable {
+  id              String          @id @default(cuid())
+  title           String
+  description     String?
+  procurementId   String
+  userInstruction String?
+  procurement     ProcurementRequest @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Question {
+  id                String    @id @default(cuid())
+  text              String
+  type              String    @default("text") // "text", "yes_no", etc.
+  required          Boolean   @default(false)
+  quantity          Int?
+  uom               String?   // unit of measure
+  benchmark         String?
+
+  deliverableId     String
+  deliverable       ScopeOfWorkDeliverable @relation(fields: [deliverableId], references: [id])
+
+  rfpId             String?
+  rfp               ProcurementRequest? @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+
+  // ✅ Parent-child linking for conditional sub-questions
+  parentQuestionId  String?
+  parentQuestion    Question? @relation("SubQuestions", fields: [parentQuestionId], references: [id])
+  subQuestions      Question[] @relation("SubQuestions")
+
+  // ✅ For conditionals
+  conditionOperator String?   // "equal to", "not equal to"
+  conditionValue    String?   // "Yes", "No"
+
+  // ✅ NEW: To persist Service Question Name for correct restoration
+  serviceName       String?   // "Cleaning", "Maintenance", etc.
+  serviceType       String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model EvaluationSection {
+  id                     String            @id @default(cuid())
+  title                  String
+  weightPercentage       Int
+  useLineLevelWeighting  Boolean           @default(false)
+  procurementRequest     ProcurementRequest @relation(fields: [procurementRequestId], references: [id])
+  procurementRequestId   String
+  items                  EvaluationItem[]
+}
+
+model EvaluationItem {
+  id                   String           @id @default(cuid())
+  description          String
+  weightPercentage     Int
+  evaluationSection    EvaluationSection @relation(fields: [evaluationSectionId], references: [id])
+  evaluationSectionId  String
+}
+
+
