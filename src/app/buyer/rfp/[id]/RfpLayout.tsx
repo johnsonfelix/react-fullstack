@@ -114,7 +114,7 @@ export default function RfpLayout({ procurement: initialProcurement }: any) {
 
     // 🚩 Allow Review only if 5 of 6 sections complete
     if (nextTab === "review" && completedCount < totalCount - 1) {
-      alert("Please complete all sections before proceeding to the review page.");
+      alert("Please complete all sections before proceeding to the review page. ");
       return;
     }
 
