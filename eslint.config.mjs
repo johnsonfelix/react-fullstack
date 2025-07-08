@@ -9,8 +9,22 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
-];
+export default [
+  // Next.js recommended config with TypeScript
+  ...compat.extends("next/core-web-vitals", "next"),
 
-export default eslintConfig;
+  // Your custom strict rules
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
+      // ❌ Block `any` usage
+      "@typescript-eslint/no-explicit-any": "error",
+      // ❌ Block unused variables
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      // ❌ Block `var` usage
+      "no-var": "error",
+      // Enforce consistent type imports
+      "@typescript-eslint/consistent-type-imports": "warn",
+    },
+  },
+];
