@@ -1,13 +1,20 @@
-// pages/address/create.tsx
-
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+type AddressForm = {
+  street: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+};
+
 export default function CreateAddress() {
   const router = useRouter();
-  const [form, setForm] = useState({
+
+  const [form, setForm] = useState<AddressForm>({
     street: "",
     city: "",
     state: "",
@@ -16,25 +23,34 @@ export default function CreateAddress() {
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((prevForm) => ({
+      ...prevForm,
+      [name]: value,
+    }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
 
-    const res = await fetch("/api/address", {
-      method: "POST",
-      body: JSON.stringify(form),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    try {
+      const res = await fetch("/api/address", {
+        method: "POST",
+        body: JSON.stringify(form),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-    if (res.ok) {
-      router.push("/administration/address");
-    } else {
-      alert("Error creating address");
+      if (res.ok) {
+        router.push("/administration/address");
+      } else {
+        const errorData = await res.json();
+        alert("Error creating address: " + (errorData.message || res.statusText));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("An unexpected error occurred.");
     }
   };
 
@@ -43,13 +59,13 @@ export default function CreateAddress() {
       <h1 className="text-2xl font-bold mb-4">Create Address</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {["street", "city", "state", "zipCode", "country"].map((field) => (
+        {Object.keys(form).map((field) => (
           <input
             key={field}
             type="text"
             name={field}
-            placeholder={field}
-            value={(form as any)[field]}
+            placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+            value={form[field as keyof AddressForm]}
             onChange={handleChange}
             className="block w-full p-2 border rounded"
             required

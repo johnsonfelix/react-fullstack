@@ -1,13 +1,47 @@
-'use client';
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+type User = {
+  username: string;
+  email: string;
+};
+
+type Subcategory = {
+  id: string;
+  name: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  subcategories?: Subcategory[];
+};
+
+type SupplierCategoryGroup = {
+  id: string;
+  name: string;
+  assignedSubcategoryIds?: string[];
+};
+
+type Supplier = {
+  id: string;
+  name: string;
+  user?: User;
+  state: string;
+  city: string;
+  zipcode: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  createdAt: string;
+  group?: SupplierCategoryGroup[];
+};
+
 export default function SupplierList() {
   const router = useRouter();
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [openModal, setOpenModal] = useState(false);
@@ -20,13 +54,13 @@ export default function SupplierList() {
 
   const fetchSuppliers = async () => {
     const res = await fetch("/api/suppliers", { cache: "no-store" });
-    const data = await res.json();
+    const data: Supplier[] = await res.json();
     setSuppliers(data);
   };
 
   const fetchCategories = async () => {
     const res = await fetch("/api/categories", { cache: "no-store" });
-    const data = await res.json();
+    const data: Category[] = await res.json();
     setCategories(data);
   };
 
@@ -39,13 +73,13 @@ export default function SupplierList() {
   };
 
   const handleAssign = async () => {
-    if (!selectedCategory) return;
+    if (!selectedCategory || !currentSupplier) return;
 
     await fetch(`/api/suppliers/${currentSupplier}/categories`, {
       method: "POST",
       body: JSON.stringify({
         categoryId: selectedCategory,
-        subcategoryIds: selectedSubcategories, // can be empty
+        subcategoryIds: selectedSubcategories,
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -129,14 +163,10 @@ export default function SupplierList() {
                   </td>
                   <td className="py-3 px-6">
                     <div className="flex flex-col gap-y-2">
-                      {supplier.group?.length > 0 ? (
-                        supplier.group.map((cat: any) => {
-                          // Find full category with all subcategories
-                          const fullCategory = categories.find(c => c.id === cat.id);
-
-                          // Filter only assigned subcategories by their IDs
-                          // Assumes cat.assignedSubcategoryIds is an array of subcategory IDs assigned to this supplier for this category
-                          const assignedSubs = fullCategory?.subcategories.filter((sub: any) =>
+                      {supplier.group && supplier.group.length > 0 ? (
+                        supplier.group.map((cat) => {
+                          const fullCategory = categories.find((c) => c.id === cat.id);
+                          const assignedSubs = fullCategory?.subcategories?.filter((sub) =>
                             cat.assignedSubcategoryIds?.includes(sub.id)
                           ) || [];
 
@@ -153,7 +183,7 @@ export default function SupplierList() {
                               </div>
                               {assignedSubs.length > 0 && (
                                 <ul className="list-disc list-inside text-gray-600 mt-1 pl-2">
-                                  {assignedSubs.map((sub: any) => (
+                                  {assignedSubs.map((sub) => (
                                     <li key={sub.id}>{sub.name}</li>
                                   ))}
                                 </ul>
@@ -219,8 +249,8 @@ export default function SupplierList() {
               </div>
               <div className="w-1/2">
                 {selectedCatObj ? (
-                  selectedCatObj.subcategories?.length > 0 ? (
-                    selectedCatObj.subcategories.map((sub: any) => (
+                  selectedCatObj.subcategories && selectedCatObj.subcategories.length > 0 ? (
+                    selectedCatObj.subcategories.map((sub) => (
                       <label key={sub.id} className="block text-sm">
                         <input
                           type="checkbox"
