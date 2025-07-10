@@ -4,22 +4,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/prisma';
 
 // GET: Fetch a single RFQ with its items
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(req: NextRequest) {
+  const id = req.nextUrl.pathname.split('/').pop(); // extract id
 
   try {
-    
     const brfq = await prisma.bRFQ.findUnique({
-    where: { id },
-    include: {
-      items: true, // include request items
-      quotes: {
-        include: {
-          items: true, // include quote items
+      where: { id },
+      include: {
+        items: true, // include request items
+        quotes: {
+          include: {
+            items: true, // include quote items
+          },
         },
       },
-    },
-  });
+    });
 
     if (!brfq) {
       return NextResponse.json({ error: 'RFQ not found' }, { status: 404 });
@@ -33,8 +32,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // DELETE: Delete a specific RFQ by ID
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.pathname.split('/').pop(); // extract id
 
   try {
     const deletedBrfq = await prisma.bRFQ.delete({
