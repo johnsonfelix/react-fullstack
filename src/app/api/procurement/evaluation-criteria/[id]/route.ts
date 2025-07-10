@@ -1,20 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+// app/api/procurement/evaluation-criteria/[id]/route.ts
+
+import { NextResponse } from "next/server";
 import prisma from "@/app/prisma";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const procurementRequestId = params.id;
-
-  if (!procurementRequestId) {
-    return NextResponse.json(
-      { error: "procurementRequestId is required" },
-      { status: 400 }
-    );
-  }
-
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const pathnameParts = url.pathname.split("/");
+    const procurementRequestId = pathnameParts.at(-1); // since path = /api/procurement/evaluation-criteria/[id]
+
+    if (!procurementRequestId) {
+      return NextResponse.json(
+        { error: "procurementRequestId is required" },
+        { status: 400 }
+      );
+    }
+
     const procurement = await prisma.procurementRequest.findUnique({
       where: { id: procurementRequestId },
       include: {
@@ -67,25 +68,21 @@ export async function GET(
 
     if (evaluationSections.length > 0) {
       sections = procurement.scopeOfWork.map((sw) => {
-        // Find if this SOW has a matching evaluationSection
         const evalSection = evaluationSections.find(
           (es) => es.title === sw.title
         );
 
-        // Filter parent questions
         const parentQuestions = sw.questions.filter(
           (q) => q.parentQuestionId === null
         );
 
-        // Build lineLevelWeights with ALL parent questions
         const lineLevelWeights = parentQuestions.map((parentQ) => {
-          // Check if this question has a saved item
           const savedItem = evalSection?.items.find(
             (item) => item.description === parentQ.text
           );
 
           return {
-            id: savedItem ? savedItem.id : parentQ.id, // use saved id if exists
+            id: savedItem ? savedItem.id : parentQ.id,
             text: parentQ.text,
             weightPercentage: savedItem ? savedItem.weightPercentage : 0,
             subQuestions: [],
@@ -96,12 +93,13 @@ export async function GET(
           id: evalSection ? evalSection.id : sw.id,
           title: sw.title,
           weightPercentage: evalSection ? evalSection.weightPercentage : 0,
-          useLineLevelWeighting: evalSection ? evalSection.useLineLevelWeighting : false,
+          useLineLevelWeighting: evalSection
+            ? evalSection.useLineLevelWeighting
+            : false,
           lineLevelWeights,
         };
       });
     } else {
-      // fallback to initial load if no evaluationSections
       sections = procurement.scopeOfWork.map((sw) => {
         const parentQuestions = sw.questions.filter(
           (q) => q.parentQuestionId === null
