@@ -3,6 +3,9 @@
 import RfpLayout from "./RfpLayout";
 import prisma from "@/app/prisma";
 
+// Force runtime fetch to avoid build-time failures if needed
+export const dynamic = "force-dynamic";
+
 export default async function RfpPage({
   params,
 }: {
