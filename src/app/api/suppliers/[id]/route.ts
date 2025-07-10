@@ -1,14 +1,18 @@
-import { NextResponse } from "next/server";
-import prisma from "@/app/prisma"; // adjust as needed
+// src/app/api/suppliers/[id]/route.ts
 
-interface Params {
-  params: { id: string };
-}
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/app/prisma";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const { id } = await params;
-
+export async function GET(req: NextRequest) {
   try {
+    const url = new URL(req.url);
+    const pathnameParts = url.pathname.split("/");
+    const id = pathnameParts.at(-1);
+
+    if (!id) {
+      return NextResponse.json({ error: "Supplier ID is required" }, { status: 400 });
+    }
+
     const supplier = await prisma.supplier.findUnique({
       where: { id },
       select: {
@@ -18,21 +22,27 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     });
 
     if (!supplier) {
-      return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
+      return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
     }
 
     return NextResponse.json(supplier);
   } catch (error) {
-    console.error('Error fetching supplier:', error);
-    return NextResponse.json({ error: 'Failed to fetch supplier' }, { status: 500 });
+    console.error("Error fetching supplier:", error);
+    return NextResponse.json({ error: "Failed to fetch supplier" }, { status: 500 });
   }
 }
 
-export async function DELETE(req: Request, { params }: Params) {
-  const supplierId = params.id;
-
+export async function DELETE(req: NextRequest) {
   try {
-    // 1. Delete the associated user (must come first due to FK constraint)
+    const url = new URL(req.url);
+    const pathnameParts = url.pathname.split("/");
+    const supplierId = pathnameParts.at(-1);
+
+    if (!supplierId) {
+      return NextResponse.json({ error: "Supplier ID is required" }, { status: 400 });
+    }
+
+    // 1. Delete the associated user (FK constraint safe)
     await prisma.user.deleteMany({
       where: { supplierId },
     });
@@ -43,30 +53,40 @@ export async function DELETE(req: Request, { params }: Params) {
     });
 
     return NextResponse.json({ message: "Supplier and User deleted successfully" });
-  } catch (error: any) {
+  } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Failed to delete supplier" }, { status: 500 });
   }
 }
 
-export default async function handler(req: any, res:any) {
-  const { id } = req.query;
-  if (req.method === "POST") {
-    const { categoryId } = req.body;
-    try {
-      await prisma.supplier.update({
-        where: { id: id as string },
-        data: {
-          group: {
-            connect: { id: categoryId },
-          },
-        },
-      });
-      res.status(200).json({ message: "Category added to supplier" });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to add category" });
+export async function POST(req: NextRequest) {
+  try {
+    const url = new URL(req.url);
+    const pathnameParts = url.pathname.split("/");
+    const id = pathnameParts.at(-1);
+
+    if (!id) {
+      return NextResponse.json({ error: "Supplier ID is required" }, { status: 400 });
     }
-  } else {
-    res.status(405).json({ error: "Method not allowed" });
+
+    const { categoryId } = await req.json();
+
+    if (!categoryId) {
+      return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
+    }
+
+    await prisma.supplier.update({
+      where: { id },
+      data: {
+        group: {
+          connect: { id: categoryId },
+        },
+      },
+    });
+
+    return NextResponse.json({ message: "Category added to supplier" });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Failed to add category" }, { status: 500 });
   }
 }
