@@ -1,11 +1,13 @@
+// app/rfp/[id]/page.tsx
+
 import RfpLayout from "./RfpLayout";
 import prisma from "@/app/prisma";
 
-interface RfpPageProps {
+export default async function RfpPage({
+  params,
+}: {
   params: { id: string };
-}
-
-export default async function RfpPage({ params }: RfpPageProps) {
+}) {
   const procurement = await prisma.procurementRequest.findUnique({
     where: { id: params.id },
     include: { scopeOfWork: true, items: true, suppliers: true },
