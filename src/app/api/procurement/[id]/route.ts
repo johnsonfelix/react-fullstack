@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/app/prisma";
 
-export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+// DELETE: Delete a procurement request by ID
+export async function DELETE(req: Request) {
   try {
-    const { id } = params;
+    const url = new URL(req.url);
+    const pathnameParts = url.pathname.split("/");
+    const id = pathnameParts.at(-1); // Extract [id] from /api/procurement/[id]
+
     console.log("Attempting to delete ProcurementRequest with ID:", id);
 
     const existing = await prisma.procurementRequest.findUnique({
@@ -37,55 +38,33 @@ export async function DELETE(
   }
 }
 
-
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+// GET: Fetch a procurement request by ID with nested relations
+export async function GET(req: Request) {
   try {
-    const { id } = params;
+    const url = new URL(req.url);
+    const pathnameParts = url.pathname.split("/");
+    const id = pathnameParts.at(-1); // Extract [id] from /api/procurement/[id]
+
     console.log("Fetching ProcurementRequest with ID:", id);
 
     const procurement = await prisma.procurementRequest.findUnique({
       where: { id },
       include: {
-        suppliers:true,
+        suppliers: true,
         scopeOfWork: {
           include: {
             questions: {
-  include: {
-    subQuestions: true, // ✅ only if subQuestions is a relation
-  },
-},
+              include: {
+                subQuestions: true, // or include: { options: true, subQuestions: { include: { options: true } } } if needed
+              },
+            },
           },
         },
+        // You can re-enable below when linked:
+        // appendix: true,
+        // evaluationCriteria: true,
       },
     });
-
-    // update this code after linking SupplierListSection, appendix, evaluation criteia
-
-    // const procurement = await prisma.procurementRequest.findUnique({
-    //   where: { id },
-    //   include: {
-    //     suppliers: true,
-    //     appendix: true,
-    //     evaluationCriteria: true,
-    //     scopeOfWork: {
-    //       include: {
-    //         questions: {
-    //           include: {
-    //             options: true,
-    //             subQuestions: {
-    //               include: {
-    //                 options: true,
-    //               },
-    //             },
-    //           },
-    //         },
-    //       },
-    //     },
-    //   },
-    // });
 
     if (!procurement) {
       console.log("ProcurementRequest not found.");
@@ -105,4 +84,3 @@ export async function GET(
     );
   }
 }
-
