@@ -4,47 +4,27 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-type Address = {
-  id: string;
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
-  createdAt: string; // or Date, depending on your backend response type
-};
-
 export default function AddressList() {
   const router = useRouter();
-  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [addresses, setAddresses] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAddresses();
   }, []);
 
   const fetchAddresses = async () => {
-    try {
-      const res = await fetch("/api/address", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to fetch addresses");
-      const data: Address[] = await res.json();
-      setAddresses(data);
-    } catch (error) {
-      console.error("Error fetching addresses:", error);
-    }
+    const res = await fetch("/api/address", { cache: "no-store" }); // Adjust if needed
+    const data = await res.json();
+    setAddresses(data);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this address?")) {
-      try {
-        const res = await fetch(`/api/address/${id}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) throw new Error("Failed to delete address");
-        fetchAddresses();
-        router.refresh();
-      } catch (error) {
-        console.error("Error deleting address:", error);
-      }
+      await fetch(`/api/address/${id}`, {
+        method: "DELETE",
+      });
+      fetchAddresses();
+      router.refresh();
     }
   };
 

@@ -2,55 +2,26 @@
 
 import { useEffect, useState } from "react";
 
-type Subcategory = {
-  id: string;
-  name: string;
-};
-
-type Category = {
-  id: string;
-  name: string;
-  subcategories?: Subcategory[];
-};
-
-type Supplier = {
-  id: string;
-  name: string;
-  city: string;
-  state: string;
-  zipcode: string;
-};
-
 export default function SupplierGroupsPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
   const fetchCategories = async () => {
-    try {
-      const res = await fetch("/api/categories");
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data: Category[] = await res.json();
-      setCategories(data);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
+    const res = await fetch("/api/categories");
+    const data = await res.json();
+    setCategories(data);
   };
 
   const fetchSuppliersByCategory = async (categoryId: string) => {
-    try {
-      setSelectedCategory(categoryId);
-      const res = await fetch(`/api/categories/${categoryId}/suppliers`);
-      if (!res.ok) throw new Error("Failed to fetch suppliers");
-      const data: Supplier[] = await res.json();
-      setSuppliers(data);
-    } catch (error) {
-      console.error("Error fetching suppliers:", error);
-    }
+    setSelectedCategory(categoryId);
+    const res = await fetch(`/api/categories/${categoryId}/suppliers`);
+    const data = await res.json();
+    setSuppliers(data);
   };
 
   return (
@@ -73,7 +44,7 @@ export default function SupplierGroupsPage() {
               {/* Subcategories */}
               {cat.subcategories && cat.subcategories.length > 0 && (
                 <ul className="ml-6 mt-1">
-                  {cat.subcategories.map((subcat) => (
+                  {cat.subcategories.map((subcat: any) => (
                     <li key={subcat.id}>
                       <div
                         onClick={() => fetchSuppliersByCategory(subcat.id)}
