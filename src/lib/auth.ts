@@ -8,7 +8,8 @@ var profileComplete:any;
 
 export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
-    secret:process.env.NEXT_AUTH_SECRET,
+    secret:"itsjohnsontesting",
+    // secret:process.env.NEXT_AUTH_SECRET,
     session: {
         strategy: 'jwt'
     },
