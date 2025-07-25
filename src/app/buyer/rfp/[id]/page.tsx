@@ -1,24 +1,17 @@
-// app/rfp/[id]/page.tsx
-
 import RfpLayout from "./RfpLayout";
-import prisma from "@/app/prisma";
 
-// Force runtime fetch to avoid build-time failures if needed
-export const dynamic = "force-dynamic";
+export default async function RfpPage({ params }: any) {
+  const { id } = params; // ✅ Do not await, id is a string here
 
-export default async function Page({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const procurement = await prisma.procurementRequest.findUnique({
-    where: { id: params.id },
-    include: { scopeOfWork: true, items: true, suppliers: true },
+  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rfp/${id}`, {
+    cache: "no-store",
   });
 
-  if (!procurement) {
+  if (!res.ok) {
     return <div className="p-8 text-red-600">RFP not found.</div>;
   }
+
+  const procurement = await res.json();
 
   return <RfpLayout procurement={procurement} />;
 }

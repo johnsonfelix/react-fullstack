@@ -133,7 +133,7 @@ export default function SupplierSelectionSection({ procurement }:{ procurement: 
         ) : (
           dbSuppliers.map(supplier => {
             const isSelected = selectedSuppliers.includes(supplier.id);
-            const email = supplier.user?.email || 'No email';
+            // const email = supplier.user?.email || 'No email';
             const address = `${supplier.city}, ${supplier.state} ${supplier.zipcode}`;
 
             return (
@@ -147,7 +147,7 @@ export default function SupplierSelectionSection({ procurement }:{ procurement: 
                 <input type="checkbox" readOnly checked={isSelected} />
                 <div>
                   <div className="font-medium">{supplier.name}</div>
-                  <div className="text-xs text-gray-600">{email}</div>
+                  {/* <div className="text-xs text-gray-600">{email}</div> */}
                   <div className="text-xs text-gray-500">{address}</div>
                 </div>
               </div>
