@@ -1,51 +1,53 @@
+// /app/supplier/submit-quote/SubmitQuoteClient.js
 'use client';
+
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-export default function SubmitQuote() {
+export default function SubmitQuoteClient() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [tokenPayload, setTokenPayload] = useState<{ rfqId: string; supplierId: string } | null>(null);
-  const [rfqDetails, setRfqDetails] = useState<any>(null);
+  const [tokenPayload, setTokenPayload] = useState(null);
+  const [rfqDetails, setRfqDetails] = useState(null);
   const [supplierName, setSupplierName] = useState('');
-  const [currencies, setCurrencies] = useState<string[]>([]);
-  const [uoms, setUoms] = useState<string[]>([]);
-  const [quoteData, setQuoteData] = useState<any[]>([]); // Per-item data
-  const [fullAddress, setFullAddress] = useState<string>('');
+  const [currencies, setCurrencies] = useState([]);
+  const [uoms, setUoms] = useState([]);
+  const [quoteData, setQuoteData] = useState([]);
+  const [fullAddress, setFullAddress] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [validFor, setValidFor] = useState('');
   const [supplierQuoteNo, setSupplierQuoteNo] = useState('');
   const [timeLeft, setTimeLeft] = useState('');
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState([]);
 
-
+  // Timer for closing
   useEffect(() => {
-  if (!rfqDetails?.closeDate) return;
+    if (!rfqDetails?.closeDate) return;
 
-  const interval = setInterval(() => {
-    const now = new Date();
-    const end = new Date(rfqDetails.closeDate);
-    const diff = end.getTime() - now.getTime();
+    const interval = setInterval(() => {
+      const now = new Date();
+      const end = new Date(rfqDetails.closeDate);
+      const diff = end.getTime() - now.getTime();
 
-    if (diff <= 0) {
-      setTimeLeft('Expired');
-      clearInterval(interval);
-      return;
-    }
+      if (diff <= 0) {
+        setTimeLeft('Expired');
+        clearInterval(interval);
+        return;
+      }
 
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-    const minutes = Math.floor((diff / (1000 * 60)) % 60);
-    const seconds = Math.floor((diff / 1000) % 60);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
 
-    setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
-  }, 1000);
+      setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    }, 1000);
 
-  return () => clearInterval(interval);
-}, [rfqDetails?.closeDate]);
+    return () => clearInterval(interval);
+  }, [rfqDetails?.closeDate]);
 
-
+  // Main fetching & token verification
   useEffect(() => {
     const verifyAndFetchRFQ = async () => {
       if (!token) return;
@@ -56,11 +58,6 @@ export default function SubmitQuote() {
         const supplierRes = await fetch(`/api/suppliers/${data.supplierId}`);
         const supplier = await supplierRes.json();
         setSupplierName(supplier.name);
-
-        console.log('data');
-        console.log(data);
-        
-        
 
         if (data?.rfqId) {
           setTokenPayload({ rfqId: data.rfqId, supplierId: data.supplierId });
@@ -74,45 +71,46 @@ export default function SubmitQuote() {
           }
 
           setSelectedCurrency(rfq.currency || '');
-          
 
+          // Fetch address
           if (rfq.shippingAddress) {
-              const addressRes = await fetch(`/api/address/${rfq.shippingAddress}`);
-              const address = await addressRes.json();
+            const addressRes = await fetch(`/api/address/${rfq.shippingAddress}`);
+            const address = await addressRes.json();
 
-              if (address?.line1) {
-  const formatted = [
-    address.line1,
-    address.city,
-    address.state,
-    address.zip ?? address.zipCode, // match DB field
-    address.country
-  ].filter(Boolean).join(', ');
+            if (address?.line1) {
+              const formatted = [
+                address.line1,
+                address.city,
+                address.state,
+                address.zip ?? address.zipCode,
+                address.country,
+              ].filter(Boolean).join(', ');
 
-  setFullAddress(formatted);
-}
+              setFullAddress(formatted);
             }
+          }
 
+          // Prefill quote data
           setQuoteData(
-  rfq.items.map((item: any) => ({
-    supplierPartNo: '',
-    deliveryDays: '',
-    unitPrice: '',
-    qty: item.quantity.toString() || '',
-    uom: item.uom || '', // ✅ prefill with item's default uom
-    cost: 0,
-  }))
-);
-
+            rfq.items.map((item) => ({
+              supplierPartNo: '',
+              deliveryDays: '',
+              unitPrice: '',
+              qty: item.quantity.toString() || '',
+              uom: item.uom || '',
+              cost: 0,
+            }))
+          );
         }
 
+        // Fetch currencies and UOMs
         const currencyRes = await fetch(`/api/administration/fields/currency`);
         const currencyList = await currencyRes.json();
-        setCurrencies(currencyList.map((c: any) => c.name));
+        setCurrencies(currencyList.map((c) => c.name));
 
         const uomRes = await fetch(`/api/administration/fields/uom`);
         const uomList = await uomRes.json();
-        setUoms(uomList.map((u: any) => u.name));
+        setUoms(uomList.map((u) => u.name));
       } catch (err) {
         console.error('Verification failed:', err);
       }
@@ -121,42 +119,23 @@ export default function SubmitQuote() {
     verifyAndFetchRFQ();
   }, [token]);
 
-  // Utility function to get file icon based on extension
-  const getFileIcon = (filename: string) => {
+  // File icon helper
+  const getFileIcon = (filename) => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
-      case 'pdf':
-        return '📄';
+      case 'pdf': return '📄';
       case 'doc':
-      case 'docx':
-        return '📝';
+      case 'docx': return '📝';
       case 'xls':
-      case 'xlsx':
-        return '📊';
+      case 'xlsx': return '📊';
       case 'jpg':
       case 'jpeg':
-      case 'png':
-        return '🖼️';
-      default:
-        return '📎';
+      case 'png': return '🖼️';
+      default: return '📎';
     }
   };
 
-  // Utility function to get readable file size
-  const getFileSize = async (filePath: string) => {
-    try {
-      const res = await fetch(filePath);
-      const blob = await res.blob();
-      const size = blob.size;
-      if (size < 1024) return `${size} bytes`;
-      if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-    } catch {
-      return 'Unknown size';
-    }
-  };
-
-  // Add this component where you want to display the files
+  // File attachment component
   const FileAttachments = () => (
     <div className="border rounded-lg p-4 bg-gray-50 mt-6">
       <h2 className="text-lg font-semibold mb-3">Attached Files</h2>
@@ -166,19 +145,15 @@ export default function SubmitQuote() {
             <div key={index} className="flex items-center justify-between p-2 border rounded hover:bg-gray-100">
               <div className="flex items-center">
                 <span className="text-xl mr-2">{getFileIcon(file)}</span>
-                <a 
-                  href={file} 
-                  target="_blank" 
+                <a
+                  href={file}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline"
                 >
                   {file.split('/').pop()}
                 </a>
               </div>
-              <span className="text-sm text-gray-500">
-                {/* Display file size - you might want to fetch this async */}
-                {/* Or you can display it after fetching in useEffect */}
-              </span>
             </div>
           ))}
         </div>
@@ -188,11 +163,8 @@ export default function SubmitQuote() {
     </div>
   );
 
-  if (!tokenPayload || !rfqDetails) return <div className="p-4">Verifying token or loading RFQ...</div>;
-
-  
-
-  const handleQuoteInputChange = (index: number, field: string, value: string) => {
+  // Handle per-item input changes
+  const handleQuoteInputChange = (index, field, value) => {
     const updated = [...quoteData];
     updated[index][field] = value;
 
@@ -205,20 +177,20 @@ export default function SubmitQuote() {
     setQuoteData(updated);
   };
 
-  const handleSubmit = async (e: any) => {
+  // Submit handler
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
 
     const payload = {
       token,
-      supplierQuoteNo: supplierQuoteNo,
-      validFor: validFor,
+      supplierQuoteNo,
+      validFor,
       currency: selectedCurrency,
       items: quoteData,
       comments: formData.get('comments'),
       shipping: formData.get('shipping'),
     };
-
 
     const res = await fetch('/api/suppliers/quote', {
       method: 'POST',
@@ -229,88 +201,107 @@ export default function SubmitQuote() {
     if (res.ok) {
       alert('Quote submitted successfully!');
     } else {
-      alert('Please Fill all the Required Feilds');
+      alert('Please Fill all the Required Fields');
     }
   };
 
-  if (!tokenPayload || !rfqDetails) return <div className="p-4">Verifying token or loading RFQ...</div>;
+  if (!tokenPayload || !rfqDetails)
+    return <div className="p-4">Verifying token or loading RFQ...</div>;
 
   return (
-
-    
-    <div className="relative  max-w-7xl mx-auto p-6 bg-white shadow rounded-lg mt-8 space-y-6">
-
+    <div className="relative max-w-7xl mx-auto p-6 bg-white shadow rounded-lg mt-8 space-y-6">
       <div className="absolute top-4 right-4 bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded shadow text-sm font-semibold">
-  Closes in: {timeLeft}
-</div>
+        Closes in: {timeLeft}
+      </div>
 
-      <h1 className="text-2xl font-bold mb-4">Submit Quote for: {rfqDetails.title} by {supplierName}</h1>
+      <h1 className="text-2xl font-bold mb-4">
+        Submit Quote for: {rfqDetails.title} by {supplierName}
+      </h1>
 
-      {/* RFQ General Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border p-4 rounded bg-gray-50 space-y-4">
           <div>
             <label className="block font-medium">Supplier Quote No</label>
             <input
-  name="supplierQuoteNo"
-  required
-  className="border rounded px-3 py-2 w-full"
-  value={supplierQuoteNo}
-  onChange={(e) => setSupplierQuoteNo(e.target.value)}
-/>
+              name="supplierQuoteNo"
+              required
+              className="border rounded px-3 py-2 w-full"
+              value={supplierQuoteNo}
+              onChange={(e) => setSupplierQuoteNo(e.target.value)}
+            />
           </div>
           <div>
             <label className="block font-medium">Valid For</label>
             <select
-  name="validFor"
-  required
-  className="border rounded px-3 py-2 w-full"
-  value={validFor}
-  onChange={(e) => setValidFor(e.target.value)}
->
-  <option>Select Vaild Days</option>
+              name="validFor"
+              required
+              className="border rounded px-3 py-2 w-full"
+              value={validFor}
+              onChange={(e) => setValidFor(e.target.value)}
+            >
+              <option>Select Valid Days</option>
               {[1, 2, 3, 4, 5, 6, 7, 10, 15, 30].map((day) => (
-                <option key={day} value={`${day} days`}>{`${day} day${day > 1 ? 's' : ''}`}</option>
+                <option key={day} value={`${day} days`}>
+                  {`${day} day${day > 1 ? 's' : ''}`}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label className="block font-medium">Currency</label>
             <select
-  name="currency"
-  required
-  className="border rounded px-3 py-2 w-full"
-  value={selectedCurrency}
-  onChange={(e) => setSelectedCurrency(e.target.value)}
->
-  <option value="">Select Currency</option>
-  {currencies.map((c) => (
-    <option key={c} value={c}>{c}</option>
-  ))}
-</select>
-
+              name="currency"
+              required
+              className="border rounded px-3 py-2 w-full"
+              value={selectedCurrency}
+              onChange={(e) => setSelectedCurrency(e.target.value)}
+            >
+              <option value="">Select Currency</option>
+              {currencies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
         <div className="border p-4 rounded bg-gray-50 space-y-2">
           <h2 className="text-lg font-semibold mb-2">RFQ Info</h2>
-          <p><strong>Close Date:</strong> {new Date(rfqDetails.closeDate).toLocaleDateString()}</p>
-          <p><strong>Urgency:</strong> {rfqDetails.urgency}</p>
-          <p><strong>Shipping Address:</strong> {fullAddress || 'Loading address...'}</p>
-          <p><strong>Payment Process:</strong> {rfqDetails.paymentProcess}</p>
-          <p><strong>Notes:</strong> {rfqDetails.notesToSupplier || 'N/A'}</p>
+          <p>
+            <strong>Close Date:</strong>{' '}
+            {new Date(rfqDetails.closeDate).toLocaleDateString()}
+          </p>
+          <p>
+            <strong>Urgency:</strong> {rfqDetails.urgency}
+          </p>
+          <p>
+            <strong>Shipping Address:</strong> {fullAddress || 'Loading address...'}
+          </p>
+          <p>
+            <strong>Payment Process:</strong> {rfqDetails.paymentProcess}
+          </p>
+          <p>
+            <strong>Notes:</strong> {rfqDetails.notesToSupplier || 'N/A'}
+          </p>
         </div>
+
         <FileAttachments />
       </div>
 
       {/* Requested Items with Quote Inputs */}
       <div className="space-y-6 ">
         <h2 className="text-xl font-semibold">Requested Items</h2>
-        {rfqDetails.items.map((item: any, i: number) => (
-          <div key={i} className="border rounded-lg shadow-sm p-6 bg-gray-50 space-y-4">
+        {rfqDetails.items.map((item, i) => (
+          <div
+            key={i}
+            className="border rounded-lg shadow-sm p-6 bg-gray-50 space-y-4"
+          >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
               <div>
-                <p className="text-md font-semibold">Item: {item.internalPartNo}</p>
+                <p className="text-md font-semibold">
+                  Item: {item.internalPartNo}
+                </p>
                 <p className="text-sm text-gray-600">{item.description}</p>
               </div>
               <div className="mt-2 md:mt-0">
@@ -322,64 +313,100 @@ export default function SubmitQuote() {
 
             <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Manufacturer</label>
-                <input disabled value={item.manufacturer} className="mt-1 w-full rounded border px-3 py-2 bg-gray-100" />
+                <label className="block text-sm font-medium text-gray-700">
+                  Manufacturer
+                </label>
+                <input
+                  disabled
+                  value={item.manufacturer}
+                  className="mt-1 w-full rounded border px-3 py-2 bg-gray-100"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Mfg Part No</label>
-                <input disabled value={item.mfgPartNo} className="mt-1 w-full rounded border px-3 py-2 bg-gray-100" />
+                <label className="block text-sm font-medium text-gray-700">
+                  Mfg Part No
+                </label>
+                <input
+                  disabled
+                  value={item.mfgPartNo}
+                  className="mt-1 w-full rounded border px-3 py-2 bg-gray-100"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Supplier Part No</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Supplier Part No
+                </label>
                 <input
                   type="text"
                   className="mt-1 w-full border rounded px-3 py-2"
                   value={quoteData[i]?.supplierPartNo || ''}
-                  onChange={(e) => handleQuoteInputChange(i, 'supplierPartNo', e.target.value)}
+                  onChange={(e) =>
+                    handleQuoteInputChange(i, 'supplierPartNo', e.target.value)
+                  }
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Delivery Days</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Delivery Days
+                </label>
                 <input
                   type="number"
                   className="mt-1 w-full border rounded px-3 py-2"
                   value={quoteData[i]?.deliveryDays || ''}
-                  onChange={(e) => handleQuoteInputChange(i, 'deliveryDays', e.target.value)}
+                  onChange={(e) =>
+                    handleQuoteInputChange(i, 'deliveryDays', e.target.value)
+                  }
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Unit Price</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Unit Price
+                </label>
                 <input
                   type="number"
                   className="mt-1 w-full border rounded px-3 py-2"
                   value={quoteData[i]?.unitPrice || ''}
-                  onChange={(e) => handleQuoteInputChange(i, 'unitPrice', e.target.value)}
+                  onChange={(e) =>
+                    handleQuoteInputChange(i, 'unitPrice', e.target.value)
+                  }
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Qty (offered)</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Qty (offered)
+                </label>
                 <input
                   type="number"
                   className="mt-1 w-full border rounded px-3 py-2"
                   value={quoteData[i]?.qty || ''}
-                  onChange={(e) => handleQuoteInputChange(i, 'qty', e.target.value)}
+                  onChange={(e) =>
+                    handleQuoteInputChange(i, 'qty', e.target.value)
+                  }
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">UOM</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  UOM
+                </label>
                 <select
-  className="mt-1 w-full border rounded px-3 py-2"
-  value={quoteData[i]?.uom || ''}
-  onChange={(e) => handleQuoteInputChange(i, 'uom', e.target.value)}
->
-  <option value="">Select UOM</option>
-  {uoms.map((u) => (
-    <option key={u} value={u}>{u}</option>
-  ))}
-</select>
+                  className="mt-1 w-full border rounded px-3 py-2"
+                  value={quoteData[i]?.uom || ''}
+                  onChange={(e) =>
+                    handleQuoteInputChange(i, 'uom', e.target.value)
+                  }
+                >
+                  <option value="">Select UOM</option>
+                  {uoms.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Cost</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Cost
+                </label>
                 <input
                   type="text"
                   disabled
@@ -395,26 +422,26 @@ export default function SubmitQuote() {
       {/* Submit Section */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="block text-sm font-medium text-gray-700">Shipping</label>
-                <select
-                  className="mt-1 w-full border rounded px-3 py-2" name="shipping" id="">
+          <label className="block text-sm font-medium text-gray-700">
+            Shipping
+          </label>
+          <select
+            className="mt-1 w-full border rounded px-3 py-2"
+            name="shipping"
+            id=""
+          >
             <option value="Included">Included</option>
             <option value="Not Included">Not Included</option>
           </select>
-          {/* <div>
-            <label className="block font-medium">Overall Price</label>
-            <input name="price" required className="border rounded px-3 py-2 w-full" />
-          </div>
-          <div>
-            <label className="block font-medium">Lead Time</label>
-            <input name="leadTime" required className="border rounded px-3 py-2 w-full" />
-          </div> */}
         </div>
         <div>
           <label className="block font-medium">Additional Info for Buyer</label>
           <textarea name="comments" className="border rounded px-3 py-2 w-full" />
         </div>
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
           Submit Quote
         </button>
       </form>
