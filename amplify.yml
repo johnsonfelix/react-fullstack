@@ -1,0 +1,32 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci --cache .npm --prefer-offline
+    build:
+      commands:
+        # Write variables into .env.production with proper names and quotes
+        - |
+          cat <<EOF > .env.production
+          POSTGRES_PRISMA_URL="$POSTGRES_PRISMA_URL"
+          POSTGRES_URL_NON_POOLING="$POSTGRES_URL_NON_POOLING"
+          NEXT_AUTH_SECRET="$NEXT_AUTH_SECRET"
+          NEXT_PUBLIC_BASE_URL="$NEXT_PUBLIC_BASE_URL"
+          AWS_ACCESS_KEY_ID="$ACCESS_KEY_ID"
+          AWS_SECRET_ACCESS_KEY="$SECRET_ACCESS_KEY"
+          AWS_REGION="$REGION"
+          REKOGNITION_MODEL_ARN="$REKOGNITION_MODEL_ARN"
+          BEDROCK_INFERENCE_PROFILE_ARN="$BEDROCK_INFERENCE_PROFILE_ARN"
+          EOF
+        # Optionally export vars for process.env at build step
+        - export $(grep -v '^#' .env.production | xargs)
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - .npm/**/*
