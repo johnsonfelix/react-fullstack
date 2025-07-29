@@ -18,6 +18,8 @@ frontend:
           REGION="$REGION"
           REKOGNITION_MODEL_ARN="$REKOGNITION_MODEL_ARN"
           BEDROCK_INFERENCE_PROFILE_ARN="$BEDROCK_INFERENCE_PROFILE_ARN"
+          EMAIL_USER="$EMAIL_USER"
+          EMAIL_PASS="$EMAIL_PASS"
           EOF
         # Optionally export vars for process.env at build step
         - export $(grep -v '^#' .env.production | xargs)
