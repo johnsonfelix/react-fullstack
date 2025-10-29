@@ -11,16 +11,6 @@ datasource d {
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-model Address {
-  id        String   @id @default(cuid())
-  street    String
-  city      String
-  state     String
-  zipCode   String
-  country   String
-  createdAt DateTime @default(now()) @map(name: "created_at")
-  updatedAt DateTime @updatedAt @map(name: "updated_at")
-}
 
 model User {
   id               String     @id @default(cuid())
@@ -39,35 +29,300 @@ model User {
 }
 
 model Supplier {
-  id        String      @id @default(cuid())
-  name      String
-  firstName String?
-  lastName  String?
-  state     String?
-  city      String?
-  zipcode   String?
-  status    String?
-  procurements ProcurementRequest[] @relation("ProcurementRequestSuppliers")
-  createdAt DateTime     @default(now()) @map(name: "created_at")
-  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+  id                    String    @id @default(cuid())
+  
+  // Company Details (Step 1)
+  companyName           String
+  registrationEmail     String    @unique
+  website               String?
+  country               String
+  tradeLicenseNumber    String?
+  taxRegistrationNumber String?
+  organizationType      String
+  supplierType          String
+  noteToApprover        String?
+  profileAttachments    String[]  // Array of file URLs
+  
+  // Relationships
+  contacts              Contact[]
+  addresses             Address[]
+  businessDocuments     BusinessDocument[]
+  bankAccounts          BankAccount[]
+  questionnaireResponse QuestionnaireResponse?
+  questionnaireAnswers  QuestionnaireAnswer[]
+  user                  User?        @relation("UserSupplier")
 
-  user      User?        @relation("UserSupplier")
-  group     Category[]   @relation("SupplierCategories") // many-to-many
+  registrationStatus     String?  // e.g. "DRAFT", "FORM_SUBMITTED", "APPROVED"
+  registrationReference  String?  // unique/visible id for the user
+  registrationSubmittedAt DateTime?
+  
+  // Add these relation fields to satisfy Category and ProcurementRequest relations:
+  productCategories     SupplierCategory[]
+  procurementRequests   ProcurementRequest[]     @relation("ProcurementRequestSuppliers")
+  
+  // Metadata
+  status                String    @default("pending") // pending, approved, rejected
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  submittedAt           DateTime?
+  
+  @@map("suppliers")
 }
 
-model Category {
-  id              String      @id @default(cuid())
-  name            String
-  createdAt       DateTime    @default(now()) @map(name: "created_at")
-  updatedAt       DateTime    @updatedAt @map(name: "updated_at")
-
-  // Self-referencing fields
-  parentCategoryId String?     
-  parentCategory   Category?   @relation("SubCategories", fields: [parentCategoryId], references: [id])
-  subcategories    Category[]  @relation("SubCategories")
-
-  suppliers        Supplier[]  @relation("SupplierCategories")
+// Step 2: Contacts
+model Contact {
+  id                      String   @id @default(cuid())
+  firstName               String
+  lastName                String
+  email                   String
+  designation             String?
+  countryCode             String
+  mobile                  String
+  isAdministrativeContact Boolean  @default(false)
+  needsUserAccount        Boolean  @default(false)
+  phone                   String?  // ADD THIS LINE
+  ext                     String?  // ADD THIS LINE
+  
+  supplier                Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId              String
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  @@map("contacts")
 }
+
+// Step 3: Addresses
+model Address {
+  id          String   @id @default(cuid())
+  type        String
+  line1       String
+  line2       String?
+  line3       String?
+  city        String
+  state       String
+  postalCode  String
+  country     String
+  usage              Json? 
+  associatedContacts Json? 
+  
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId  String
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("addresses")
+}
+
+// Step 4: Business Documents
+model BusinessDocument {
+  id                  String    @id @default(cuid())
+  classification      String    // e.g., "INSURANCE", "CERTIFICATION"
+  subClassification   String?
+  certifyingAgency    String?
+  certificateNumber   String?
+  certificateStartDate DateTime?
+  certificateEndDate  DateTime?
+  otherCertifyingAgency String?
+  notes               String?
+  attachments         String[]  // Array of file URLs
+  
+  supplier            Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId          String
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@map("business_documents")
+}
+
+// Step 5: Bank Accounts
+model BankAccount {
+  id            String   @id @default(cuid())
+  country       String
+  currency      String
+  accountType   String 
+  bankName      String
+  accountNumber String
+  accountHolder String
+  bankBranch    String? 
+  iban          String?
+  swiftCode     String?
+  
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId    String
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("bank_accounts")
+}
+
+//  model Category {
+//    id              String      @id @default(cuid())
+//    name            String
+//    createdAt       DateTime    @default(now()) @map(name: "created_at")
+//    updatedAt       DateTime    @updatedAt @map(name: "updated_at")
+//  
+//    // Self-referencing fields
+//    parentCategoryId String?     
+//    parentCategory   Category?   @relation("SubCategories", fields: [parentCategoryId], references: [id])
+//    subcategories    Category[]  @relation("SubCategories")
+//  
+//    suppliers        Supplier[]  @relation("SupplierCategories")
+//  }
+
+// Step 6: Product Categories
+model ProductCategory {
+  id          String             @id @default(cuid())
+  name        String
+  parentId    String?
+  description String?
+  parent      ProductCategory?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    ProductCategory[]  @relation("CategoryHierarchy")
+
+  suppliers   SupplierCategory[] // join records
+
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("product_categories")
+}
+
+// join table already present in your schema — leave as-is
+model SupplierCategory {
+  id              String          @id @default(cuid())
+
+  supplier        Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId      String
+
+  productCategory ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId      String
+
+  createdAt       DateTime        @default(now())
+
+  @@unique([supplierId, categoryId])
+  @@map("supplier_categories")
+}
+
+// Step 7: Questionnaire
+
+ model QuestionnaireTemplate {
+   id          String                  @id @default(cuid())
+   name        String
+   description String?
+   isActive    Boolean                 @default(true)
+   // each template belongs to a category (required per your request)
+   categoryId  String
+   category    QuestionnaireCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+   questions   QuestionnaireQuestion[]
+   createdAt   DateTime                @default(now())
+   updatedAt   DateTime                @updatedAt
+
+   @@map("questionnaire_templates")
+ }
+
+ model QuestionnaireCategory {
+   id         String                 @id @default(cuid())
+   name       String
+   order      Int                    @default(0)
+   // a category may have many templates
+   templates  QuestionnaireTemplate[]
+   // questions can also reference this category (optional)
+   questions  QuestionnaireQuestion[] 
+
+   createdAt  DateTime               @default(now())
+   updatedAt  DateTime               @updatedAt
+
+   @@map("questionnaire_categories")
+ }
+
+// Questions in a template
+model QuestionnaireQuestion {
+  id               String                @id @default(cuid())
+  text             String
+  description      String?
+  type             String                @default("text")
+  required         Boolean               @default(false)
+  order            Int                   @default(0)
+
+  options          Json?
+  validation       Json?
+
+  // attachments array (fixed)
+  attachments      String[]              @default([])
+
+  // category relation (optional)
+  categoryId       String?
+  category         QuestionnaireCategory? @relation(fields: [categoryId], references: [id])
+
+  // template relation
+  templateId       String
+  template         QuestionnaireTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  // nested/sub-question self-relation
+  parentQuestionId String?
+  parentQuestion   QuestionnaireQuestion? @relation("SubQ", fields: [parentQuestionId], references: [id])
+  subQuestions     QuestionnaireQuestion[] @relation("SubQ")
+
+  answers          QuestionnaireAnswer[]
+
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@map("questionnaire_questions")
+}
+
+// Supplier's answers
+model QuestionnaireAnswer {
+  id         String                @id @default(cuid())
+  answer     Json                  // Flexible storage for any answer type
+  
+  questionId String
+  question   QuestionnaireQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  supplierId String
+  supplier   Supplier              @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  
+  @@unique([questionId, supplierId])
+  @@map("questionnaire_answers")
+}
+
+model QuestionnaireResponse {
+  id                            String   @id @default(cuid())
+  
+  // Declarations
+  hasQualityManagementSystem    Boolean  @default(false)
+  hasEnvironmentalCertification Boolean  @default(false)
+  hasHealthSafetyCertification  Boolean  @default(false)
+  acceptsTermsAndConditions     Boolean  @default(false)
+  
+  // Minimum Required Documents
+  hasBusinessLicense            Boolean  @default(false)
+  hasTaxCertificate             Boolean  @default(false)
+  hasInsuranceCertificate       Boolean  @default(false)
+  
+  // F&B Specific (if applicable)
+  hasFoodSafetyCertificate      Boolean  @default(false)
+  hasHalalCertificate           Boolean  @default(false)
+  hasOrganicCertificate         Boolean  @default(false)
+  
+  // Additional responses
+  additionalNotes               String?
+  
+  supplier                      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId                    String   @unique
+  
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+  
+  @@map("questionnaire_responses")
+}
+
 
 model Currency {
   id        String      @id @default(cuid())
@@ -272,6 +527,16 @@ model EvaluationItem {
   weightPercentage     Int
   evaluationSection    EvaluationSection @relation(fields: [evaluationSectionId], references: [id])
   evaluationSectionId  String
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  otp       String
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 

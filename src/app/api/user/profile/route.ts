@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         user: {
           connect: { id: userId }
         }
-      }
+      } as any
     });
 
     // Update the User to link to the Supplier

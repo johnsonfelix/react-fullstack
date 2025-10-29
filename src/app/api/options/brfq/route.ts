@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const [currencies, customerCategories, shippingTypes, urgencies, uoms, suppliers,address,payment] = await Promise.all([
       prisma.currency.findMany(),
-      prisma.category.findMany(),
+      prisma.productCategory.findMany(),
       prisma.shipping.findMany(),
       prisma.urgency.findMany(),
       prisma.uom.findMany(),

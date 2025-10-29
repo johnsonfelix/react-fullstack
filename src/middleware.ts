@@ -1,26 +1,48 @@
-// middleware.js or middleware.ts
+// middleware.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 export async function middleware(request: NextRequest) {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get('next-auth.session-token');
+  // Get the session token directly from the request cookies
+  const sessionToken = request.cookies.get('next-auth.session-token');
+  const { pathname } = request.nextUrl;
 
-  // Define restricted paths that require a session token
-  const restrictedPaths = ['/dashboard', '/profile', '/admin', '/administration'];
+  // Define paths that are publicly accessible
+  const publicPaths = [
+    '/sign-in',
+    '/supplier-registration', 
+    '/supplier-verify',
+    // Add other public paths here, e.g., '/', '/about'
+  ];
 
-  // Check if the user is trying to access a restricted path
-  const isRestrictedPath = restrictedPaths.some(path =>
-    request.nextUrl.pathname.startsWith(path)
-  );
+  // Check if the requested path is in the publicPaths array
+  // or starts with a public path (e.g., /supplier-registration/step-2)
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
 
-  // If there is no session token and the user is trying to access a restricted page, redirect to sign-in
-  if (!sessionToken && isRestrictedPath) {
-    console.log('Redirecting to /sign-in');
+  // If the path is public, allow access immediately
+  if (isPublicPath) {
+    return NextResponse.next();
+  }
+
+  // If the path is not public and there is no session token, redirect to sign-in
+  if (!sessionToken) {
+    console.log('Redirecting to /sign-in for protected route:', pathname);
     return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
-  // If the user has a session token or is accessing an unrestricted page, allow access
+  // If a session token exists, allow access to the protected route
   return NextResponse.next();
 }
 
+// Optional: Use a matcher to specify which paths the middleware should run on
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+};

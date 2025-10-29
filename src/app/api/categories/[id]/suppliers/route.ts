@@ -11,20 +11,22 @@ export async function GET(req: NextRequest) {
     }
 
     const suppliers = await prisma.supplier.findMany({
-      where: {
-        group: {
-          some: {
-            id,
-          },
+  where: {
+    productCategories: {
+      some: {
+        productCategory: {
+          id, // id should be string or number depending on your schema
         },
       },
-      include: {
-        user: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    },
+  },
+  include: {
+    user: true,
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+});
 
     return NextResponse.json(suppliers);
   } catch (error) {

@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   const query = searchParams.get("q") || "";
 
   try {
-    const categories = await prisma.category.findMany({
+    const categories = await prisma.productCategory.findMany({
       where: {
         name: {
           contains: query,

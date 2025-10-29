@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/app/components/ui/button";
-import Checkbox from "@/app/components/ui/Checkbox";
+import { Checkbox } from "@radix-ui/react-checkbox";
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textArea";
 import { Label } from "@radix-ui/react-label";
@@ -235,7 +235,8 @@ export default function HeaderSection({ procurement }: any) {
       <div>
         <h3 className="text-lg font-semibold mb-2">Non-disclosure Agreement (NDA)</h3>
         <div className="flex items-center space-x-2">
-          <Checkbox id="nda" checked={ndaChecked} onCheckedChange={setNdaChecked} />
+          {/* <Checkbox id="nda" checked={ndaChecked} onCheckedChange={setNdaChecked} /> */}
+          <Checkbox id="nda" checked={ndaChecked} />
           <Label htmlFor="nda" className="cursor-pointer">
             Suppliers must agree to the terms of the NDA to view this event
           </Label>

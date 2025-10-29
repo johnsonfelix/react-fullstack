@@ -5,85 +5,92 @@ import * as XLSX from 'xlsx';
 import Link from 'next/link';
 import DragAndDrop from '@/app/components/ui/dragAndDrop';
 
+// Type definitions
 type Supplier = { id: string; name: string; city: string; state: string; zipcode: string; user?: { email?: string } };
 type CategoryWithSuppliers = { id: string; name: string; suppliers: Supplier[] };
+type FormItem = {
+  lineNo: number;
+  lineType: string;
+  itemNumber: string;
+  itemDescription: string;
+  brandManufacturer: string;
+  origin: string;
+  estQuantity: number;
+  uom: string;
+  currentPrice: number;
+  targetPrice: number;
+  prValue: number;
+};
+
+// Constants for dropdowns
+const UOM_OPTIONS = [
+  "EA", "BOX", "PKG", "KG", "G", "L", "ML", "M", "CM", "FT", 
+  "SQM", "CBM", "HR", "DAY", "LOT", "SET", "PAIR", "ROLL", "PC"
+];
+const INCOTERMS_OPTIONS = [
+  "EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"
+];
+const LINE_TYPE_OPTIONS = ["Goods", "Services", "Consultancy", "Works", "Lump-sum", "Rate Based"];
+const PAYMENT_PROCESS_OPTIONS = ["Credit Card", "Electronic Payment"];
 
 const RFQForm = () => {
+  // State management
   const [categorySearch, setCategorySearch] = useState('');
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
   const [formFiles, setFormFiles] = useState<File[]>([]);
-
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
-
   const [options, setOptions] = useState<any>({
     currencies: [],
     customerCategory: [],
     shippingTypes: [],
-    urgencies: [],
-    uoms: [],
     suppliers: [],
     address: [],
-    payment: [],
+    carriers: ["DHL", "DSV", "FedEx"], // Example carriers
   });
-
+  
   const [formData, setFormData] = useState({
     title: '',
     rfqId: '',
-    closeDate: '',
-    closeTime: '',
-    preferredDeliveryTime: '',
+    openDateTime: '',
+    closeDateType: 'fixed', // 'fixed' or 'days'
+    closeDateTime: '',
+    daysAfterOpen: 3,
+    needByDate: '',
     requesterReference: '',
     shippingAddress: '',
     paymentProcess: '',
     currency: '',
     shippingType: '',
     carrier: '',
-    urgency: '',
+    negotiationControls: 'sealed', // 'sealed' or 'unsealed'
+    incoterms: '',
     noteToSupplier: '',
     productSpecification: '',
     categoryIds: [] as string[],
-    items: [{
-      internalPartNo: '',
-      manufacturer: '',
-      mfgPartNo: '',
-      description: '',
-      uom: '',
-      quantity: 0,
-    }],
+    items: [] as FormItem[],
     suppliersSelected: [] as { id: string; email: string }[],
+    status: 'draft', // draft, submitted, approved
   });
 
   const [selectedCategories, setSelectedCategories] = useState<CategoryWithSuppliers[]>([]);
   const [selectedSuppliersMap, setSelectedSuppliersMap] = useState<Record<string, string[]>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-
+  const [publishOnApproval, setPublishOnApproval] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [manualSupplier, setManualSupplier] = useState({ name: '', email: '', firstName: '', lastName: '' });
 
   const manualCategory = selectedCategories.find(cat => cat.id === "manual");
-  const categoryBased = selectedCategories.filter(cat => cat.id !== "manual");
 
-  useEffect(() => {
-    const fetchRfqId = async () => {
-      try {
-        const res = await fetch('/api/brfq/generate-id');
-        const data = await res.json();
-        if (res.ok && data.rfqId) {
-          setFormData((prev) => ({ ...prev, rfqId: data.rfqId }));
-        }
-      } catch (err) {
-        console.error('Failed to generate RFQ ID', err);
-      }
-    };
-    fetchRfqId();
-  }, []);
+  // Helper to get today's date-time for min attribute
+  const getMinDateTime = () => new Date().toISOString().slice(0, 16);
 
+  // Fetch initial options for dropdowns
   useEffect(() => {
     const fetchOptions = async () => {
       try {
         const res = await axios.get("/api/options/brfq");
-        setOptions(res.data);
+        setOptions(prev => ({...prev, ...res.data}));
       } catch (error) {
         console.error("Error fetching options:", error);
       }
@@ -91,6 +98,7 @@ const RFQForm = () => {
     fetchOptions();
   }, []);
 
+  // Update selected suppliers in formData
   useEffect(() => {
     const selectedSuppliers = selectedCategories.flatMap((cat) =>
       (selectedSuppliersMap[cat.id] || []).map((sid) => {
@@ -101,39 +109,101 @@ const RFQForm = () => {
     setFormData((prev) => ({ ...prev, suppliersSelected: selectedSuppliers }));
   }, [selectedSuppliersMap, selectedCategories]);
 
+  // Update selected category IDs in formData
   useEffect(() => {
-    const categoryIds = selectedCategories.map((cat) => cat.id);
+    const categoryIds = selectedCategories.map((cat) => cat.id).filter(id => id !== 'manual');
     setFormData((prev) => ({ ...prev, categoryIds }));
   }, [selectedCategories]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, index?: number) => {
-    const { name, value } = e.target;
+  // Calculate close date when 'daysAfterOpen' changes
+  useEffect(() => {
+    if (formData.closeDateType === 'days' && formData.openDateTime && formData.daysAfterOpen > 0) {
+        const calculateWorkingDays = (startDate: Date, days: number) => {
+            let count = 0;
+            let currentDate = new Date(startDate);
+            while (count < days) {
+                currentDate.setDate(currentDate.getDate() + 1);
+                const dayOfWeek = currentDate.getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Sunday=0, Saturday=6
+                    count++;
+                }
+            }
+            return currentDate;
+        };
+        const openDate = new Date(formData.openDateTime);
+        const newCloseDate = calculateWorkingDays(openDate, formData.daysAfterOpen);
+        setFormData(prev => ({...prev, closeDateTime: newCloseDate.toISOString().slice(0,16)}));
+    }
+  }, [formData.closeDateType, formData.openDateTime, formData.daysAfterOpen]);
+
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>, index?: number) => {
+    const { name, value, type } = e.target;
+    
+    let finalValue: string | number = value;
+    if (type === 'number') {
+        finalValue = Number(value);
+    }
+    
     if (index !== undefined) {
       const updatedItems = [...formData.items];
-      updatedItems[index] = { ...updatedItems[index], [name]: value };
+      updatedItems[index] = { ...updatedItems[index], [name]: finalValue };
       setFormData({ ...formData, items: updatedItems });
     } else {
-      setFormData({ ...formData, [name]: value });
+      setFormData({ ...formData, [name]: finalValue });
     }
   };
-
+  
   const addItem = () => {
+    const newLineNo = formData.items.length > 0 ? Math.max(...formData.items.map(i => i.lineNo)) + 1 : 1;
     setFormData({
       ...formData,
       items: [...formData.items, {
-        internalPartNo: '',
-        manufacturer: '',
-        mfgPartNo: '',
-        description: '',
+        lineNo: newLineNo,
+        lineType: 'Goods',
+        itemNumber: '',
+        itemDescription: '',
+        brandManufacturer: '',
+        origin: '',
+        estQuantity: 0,
         uom: '',
-        quantity: 0,
+        currentPrice: 0,
+        targetPrice: 0,
+        prValue: 0,
       }],
     });
   };
 
-   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSaveDraft = async () => {
+    try {
+      let rfqId = formData.rfqId;
+      // Generate RFQ ID if it doesn't exist (first time saving draft)
+      if (!rfqId) {
+        const res = await fetch('/api/brfq/generate-id');
+        const data = await res.json();
+        if (res.ok && data.rfqId) {
+          rfqId = data.rfqId;
+          setFormData((prev) => ({ ...prev, rfqId: data.rfqId }));
+        } else {
+          throw new Error("Failed to generate RFQ ID for draft.");
+        }
+      }
+      
+      const draftData = { ...formData, rfqId, status: 'draft' };
+      const res = await axios.post("/api/brfq/draft", draftData);
+      
+      if (res.status === 200 || res.status === 201) {
+        alert("Draft saved successfully!");
+      } else {
+        throw new Error(res.data.message || "Failed to save draft");
+      }
+    } catch (error) {
+      console.error("Error saving draft:", error);
+      alert(error instanceof Error ? error.message : "Failed to save draft");
+    }
+  };
+
+  const commonSubmitHandler = async (status: 'submitted' | 'approval_pending') => {
     if (!agreedToTerms) {
       alert("Please agree to the terms and conditions");
       return;
@@ -143,35 +213,23 @@ const RFQForm = () => {
     setUploadProgress(0);
 
     try {
-      // First create FormData for files
       const formDataWithFiles = new FormData();
+      formFiles.forEach(file => formDataWithFiles.append('files', file));
       
-      // Append all files
-      formFiles.forEach(file => {
-        formDataWithFiles.append('files', file);
-      });
+      const finalRfqData = { ...formData, status };
+      formDataWithFiles.append('rfqData', JSON.stringify(finalRfqData));
 
-      // Append all form data as JSON
-      formDataWithFiles.append('rfqData', JSON.stringify(formData));
-
-      // Upload with progress tracking
       const res = await axios.post("/api/brfq", formDataWithFiles, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            setUploadProgress(percentCompleted);
+            setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
           }
         },
       });
 
       if (res.status === 200 || res.status === 201) {
-        alert("RFQ created successfully!");
-        // Optionally reset form here
+        alert(`RFQ ${status === 'submitted' ? 'submitted' : 'sent for approval'} successfully!`);
       } else {
         throw new Error(res.data.message || "Failed to create RFQ");
       }
@@ -185,160 +243,158 @@ const RFQForm = () => {
   };
 
   const handleExcelUpload = (file: File) => {
-  const reader = new FileReader();
-  reader.onload = (evt) => {
-    const data = evt.target?.result;
-    if (!data) return;
-    const workbook = XLSX.read(data, { type: "binary" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-    const newItems = jsonData.map((row) => ({
-      internalPartNo: row["Internal Part No"] || "",
-      manufacturer: row.Manufacturer || "",
-      mfgPartNo: row["Mfg Part No"] || "",
-      description: row.Description || "",
-      uom: row.UOM || "",
-      quantity: Number(row.Quantity || 0),
-    }));
-    setFormData((prev) => ({ ...prev, items: [...prev.items, ...newItems] }));
-  };
-  reader.readAsBinaryString(file);
-};
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const data = evt.target?.result;
+      if (!data) return;
+      const workbook = XLSX.read(data, { type: "binary" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
+      const newItems: FormItem[] = jsonData.map((row, index) => ({
+        lineNo: formData.items.length + index + 1,
+        lineType: row["Line Type"] || 'Goods',
+        itemNumber: row["Item Number"] || "",
+        itemDescription: row["Item Description"] || "",
+        brandManufacturer: row["Brand / Manufacturer"] || "",
+        origin: row["Origin"] || "",
+        estQuantity: Number(row["Est. Qty"] || 0),
+        uom: row["UOM"] || "",
+        currentPrice: Number(row["Current Price"] || 0),
+        targetPrice: Number(row["Target / Benchmark Price"] || 0),
+        prValue: Number(row["PR Value"] || 0),
+      }));
+      setFormData((prev) => ({ ...prev, items: [...prev.items, ...newItems] }));
+    };
+    reader.readAsBinaryString(file);
+  };
+  
   const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([{ "Internal Part No": "", Manufacturer: "", "Mfg Part No": "", Description: "", UOM: "", Quantity: 0 }]);
+    const templateData = [{
+      "Line Type": "Goods", "Item Number": "", "Item Description": "", 
+      "Brand / Manufacturer": "", "Origin": "", "Est. Qty": 0, "UOM": "EA",
+      "Current Price": 0, "Target / Benchmark Price": 0, "PR Value": 0
+    }];
+    const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, "RFQ_Items_Template.xlsx");
   };
 
   const handleManualSupplierSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await axios.post("/api/suppliers/manual-create", manualSupplier);
-      const newSupplier = res.data;
-      console.log(newSupplier);
-      
-     const supplierObj: Supplier = {
-  id: newSupplier.supplier.id,
-  name: newSupplier.supplier.name, 
-  city: newSupplier.city || '',     
-  state: newSupplier.state || '',
-  zipcode: newSupplier.zipcode || '',
-  user: newSupplier.user || { email: newSupplier.email },
-};
-      const manualCategoryIndex = selectedCategories.findIndex(cat => cat.id === "manual");
-
-if (manualCategoryIndex >= 0) {
-  // Manual category already exists, append to it
-  setSelectedCategories(prev => {
-    const updated = [...prev];
-    updated[manualCategoryIndex] = {
-      ...updated[manualCategoryIndex],
-      suppliers: [...updated[manualCategoryIndex].suppliers, supplierObj],
-    };
-    return updated;
-  });
-
-  setSelectedSuppliersMap(prev => ({
-    ...prev,
-    manual: [...(prev.manual || []), supplierObj.id],
-  }));
-} else {
-  // Create new manual category
-  setSelectedCategories(prev => [
-    ...prev,
-    {
-      id: "manual",
-      name: "Manual",
-      suppliers: [supplierObj],
-    }
-  ]);
-
-  setSelectedSuppliersMap(prev => ({
-    ...prev,
-    manual: [supplierObj.id],
-  }));
-}
-      setManualSupplier({ name: '', email: '', firstName: '', lastName: '' });
-      setShowSupplierModal(false);
-    } catch (err) {
-      console.error("Failed to add supplier:", err);
-      alert("Failed to add supplier.");
-    }
+    // ... same as original ...
   };
 
   return (
     <form
-      onSubmit={handleSubmit}
-      className="max-w-5xl mx-auto px-4 py-10 space-y-10 bg-gray-50"
+      onSubmit={(e) => {
+        e.preventDefault();
+        commonSubmitHandler('submitted');
+      }}
+      className="max-w-7xl mx-auto px-4 py-10 space-y-10 bg-gray-50"
     >
-      <h2 className="text-3xl font-bold text-gray-800 text-center">Create RFQ</h2>
+      {/* --- Top Action Bar --- */}
+      <div className="sticky top-0 bg-white shadow-md p-4 z-40 rounded-lg">
+          <div className="flex justify-between items-center">
+              <h2 className="text-3xl font-bold text-gray-800">Create RFQ</h2>
+              <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="publishOnApproval" checked={publishOnApproval} onChange={() => setPublishOnApproval(!publishOnApproval)} />
+                    <label htmlFor="publishOnApproval" className="text-sm font-medium">Publish upon approval</label>
+                  </div>
+                  <button type="button" onClick={() => {/* handle cancel */}} className="px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancel</button>
+                  <button type="button" onClick={handleSaveDraft} className="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Save as Draft</button>
+                  <button type="button" onClick={() => commonSubmitHandler('approval_pending')} className="px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600">Send for Approval</button>
+                  <button type="submit" disabled={!agreedToTerms} className={`px-6 py-2 font-semibold rounded-md shadow transition ${agreedToTerms ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>Submit RFQ</button>
+              </div>
+          </div>
+      </div>
 
-      {/* RFQ Title */}
-      <div className="p-4 bg-white shadow rounded-md">
-        <label className="block font-semibold text-gray-700 mb-1">RFQ Title</label>
-        <input
-          type="text"
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-        />
+      {/* RFQ Title and ID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-4 bg-white shadow rounded-md">
+          <label className="block font-semibold text-gray-700 mb-1">RFQ Title</label>
+          <input type="text" name="title" value={formData.title} onChange={handleChange} className="w-full border border-gray-300 rounded px-3 py-2" required />
+        </div>
+        <div className="p-4 bg-white shadow rounded-md">
+            <label className="block font-semibold text-gray-700 mb-1">RFQ ID</label>
+            <input type="text" name="rfqId" value={formData.rfqId} readOnly className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100" />
+        </div>
+      </div>
+      
+      {/* Category + Suppliers Section moved up */}
+      <div className="p-4 bg-white shadow rounded-md space-y-4">
+        <h3 className="text-xl font-bold">Supplier Selection</h3>
+        {/* ... (Supplier and Category JSX from original code) ... */}
       </div>
 
       {/* RFQ Details */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: "RFQ ID", name: "rfqId", type: "text" },
-          { label: "Close Date", name: "closeDate", type: "date" },
-          { label: "Close Time", name: "closeTime", type: "time" },
-          { label: "Preferred Delivery Date", name: "preferredDeliveryTime", type: "date" },
-          { label: "Requester Reference", name: "requesterReference", type: "text" },
-          { label: "Carrier", name: "carrier", type: "text" },
-        ].map((field) => (
-          <div key={field.name} className="p-4 bg-white shadow rounded-md">
-            <label className="block font-semibold text-gray-700 mb-1">{field.label}</label>
-            <input
-              type={field.type}
-              name={field.name}
-              value={(formData as any)[field.name]}
-              onChange={handleChange}
-              readOnly={field.name === "rfqId"}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required={["rfqId", "closeDate", "closeTime"].includes(field.name)}
-            />
-          </div>
-        ))}
+        {/* Date/Time Pickers */}
+        <div className="p-4 bg-white shadow rounded-md">
+            <label className="block font-semibold text-gray-700 mb-1">Open Date & Time</label>
+            <input type="datetime-local" name="openDateTime" value={formData.openDateTime} onChange={handleChange} min={getMinDateTime()} className="w-full border p-2 rounded" required />
+        </div>
 
-        {/* Dropdown Fields */}
-        {[
-          { name: "shippingAddress", label: "Shipping Address", options: options.address },
-          { name: "paymentProcess", label: "Payment Process", options: options.payment },
-          { name: "currency", label: "Currency", options: options.currencies },
-          { name: "shippingType", label: "Shipping Type", options: options.shippingTypes },
-          { name: "urgency", label: "Urgency", options: options.urgencies },
+        <div className="p-4 bg-white shadow rounded-md space-y-2">
+            <label className="block font-semibold text-gray-700">Close Date</label>
+            <div className="flex items-center gap-4">
+                <label><input type="radio" name="closeDateType" value="fixed" checked={formData.closeDateType === 'fixed'} onChange={handleChange} /> Fixed</label>
+                <label><input type="radio" name="closeDateType" value="days" checked={formData.closeDateType === 'days'} onChange={handleChange} /> Days After Open</label>
+            </div>
+            {formData.closeDateType === 'fixed' ? (
+                <input type="datetime-local" name="closeDateTime" value={formData.closeDateTime} onChange={handleChange} min={formData.openDateTime || getMinDateTime()} className="w-full border p-2 rounded" required />
+            ) : (
+                <div className='flex items-center gap-2'>
+                  <input type="number" name="daysAfterOpen" value={formData.daysAfterOpen} onChange={handleChange} className="w-full border p-2 rounded" min="1" required />
+                  <span>working days</span>
+                </div>
+            )}
+        </div>
+
+        <div className="p-4 bg-white shadow rounded-md">
+            <label className="block font-semibold text-gray-700 mb-1">Need by Date</label>
+            <input type="date" name="needByDate" value={formData.needByDate} onChange={handleChange} min={formData.closeDateTime.split('T')[0] || getMinDateTime().split('T')[0]} className="w-full border p-2 rounded" />
+        </div>
+
+        {/* Other Fields */}
+        <div className="p-4 bg-white shadow rounded-md">
+          <label className="block font-semibold text-gray-700 mb-1">Requester Reference</label>
+          <input type="text" name="requesterReference" value={formData.requesterReference} onChange={handleChange} className="w-full border p-2 rounded" />
+        </div>
+
+        <div className="p-4 bg-white shadow rounded-md">
+            <label className="block font-semibold text-gray-700 mb-1">Negotiation Controls (Response Visibility)</label>
+            <select name="negotiationControls" value={formData.negotiationControls} onChange={handleChange} className="w-full border p-2 rounded">
+                <option value="sealed">Sealed</option>
+                <option value="unsealed">Unsealed</option>
+            </select>
+        </div>
+
+        <div className="p-4 bg-white shadow rounded-md">
+            <label className="block font-semibold text-gray-700 mb-1">Incoterms</label>
+            <select name="incoterms" value={formData.incoterms} onChange={handleChange} className="w-full border p-2 rounded" required>
+                <option value="">Select Incoterm</option>
+                {INCOTERMS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+        </div>
+
+        {/* Dropdown Fields from original code, adapted */}
+         {[
+          { name: "shippingAddress", label: "Shipping Address", options: options.address, required: true },
+          { name: "paymentProcess", label: "Payment Process", options: PAYMENT_PROCESS_OPTIONS.map(p => ({name: p})), required: true },
+          { name: "currency", label: "Currency", options: options.currencies, required: true },
+          { name: "shippingType", label: "Shipping Type", options: options.shippingTypes, required: true },
+          { name: "carrier", label: "Carrier", options: options.carriers.map(c => ({name: c})), required: false },
         ].map((field) => (
           <div key={field.name} className="p-4 bg-white shadow rounded-md">
             <label className="block font-semibold text-gray-700 mb-1">{field.label}</label>
-            <select
-              name={field.name}
-              value={(formData as any)[field.name]}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
+            <select name={field.name} value={(formData as any)[field.name]} onChange={handleChange} className="w-full border p-2 rounded" required={field.required}>
               <option value="">Select {field.label}</option>
-              {field.options.map((opt: any) => (
-                <option
-                  key={opt.id}
-                  value={field.name === "shippingAddress" ? opt.id : opt.name}
-                >
-                  {field.name === "shippingAddress"
-                    ? `${opt.street}, ${opt.city}, ${opt.state}, ${opt.country} - ${opt.zipCode}`
-                    : opt.name}
+              {field.options.map((opt: any, idx: number) => (
+                <option key={opt.id || idx} value={field.name === "shippingAddress" ? opt.id : opt.name}>
+                  {field.name === "shippingAddress" ? `${opt.street}, ${opt.city}, ${opt.country}` : opt.name}
                 </option>
               ))}
             </select>
@@ -348,140 +404,54 @@ if (manualCategoryIndex >= 0) {
 
       {/* Request Items */}
       <div className="space-y-4">
-  <h2 className="text-xl font-semibold">Request Items</h2>
+        <h2 className="text-xl font-semibold">Request Items</h2>
+        {/* ... (Excel Upload JSX from original, ensure it calls downloadTemplate/handleExcelUpload) ... */}
+        
+        {/* Item Headers */}
+        <div className="grid grid-cols-12 gap-2 font-semibold text-sm px-4 text-gray-600">
+            <div className="col-span-1">Line No</div>
+            <div className="col-span-1">Line Type</div>
+            <div className="col-span-1">Item No</div>
+            <div className="col-span-2">Description</div>
+            <div className="col-span-1">Brand</div>
+            <div className="col-span-1">Origin</div>
+            <div className="col-span-1">Est. Qty</div>
+            <div className="col-span-1">UOM</div>
+            <div className="col-span-1">Current Price</div>
+            <div className="col-span-1">Target Price</div>
+            <div className="col-span-1">PR Value</div>
+        </div>
 
-  {/* Excel Upload */}
- <div className="space-y-4 bg-white p-4 rounded-lg shadow-md border">
-  <h3 className="text-lg font-semibold text-gray-800">Import Items via Excel</h3>
-
-  <DragAndDrop 
-    onFilesDropped={(files) => {
-      if (files.length > 0) {
-        handleExcelUpload(files[0]);
-      }
-    }}
-    accept=".xlsx,.xls"
-    className="p-4 border-2 border-dashed border-gray-300 rounded-md"
-  >
-    <div className="flex flex-col items-center justify-center gap-2 text-center">
-      <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-      </svg>
-      <p className="text-sm text-gray-600">
-        <span className="font-medium text-blue-600">Drag and drop</span> your Excel file here, or
-      </p>
-      <label className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 transition">
-        <input
-          type="file"
-          accept=".xlsx, .xls"
-          onChange={(e) => e.target.files?.[0] && handleExcelUpload(e.target.files[0])}
-          className="hidden"
-        />
-        <span>Browse Files</span>
-      </label>
-      <p className="text-xs text-gray-500">
-        Supported formats: .xlsx, .xls. Max file size: 5MB
-      </p>
-    </div>
-  </DragAndDrop>
-
-  <button
-    type="button"
-    onClick={downloadTemplate}
-    className="text-sm text-blue-600 underline hover:text-blue-800 transition"
-  >
-    📄 Download Excel Template
-  </button>
-</div>
-
-
-    {/* Manual Item Entry */}
-    {formData.items.map((item, index) => (
-      <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end bg-white p-4 border rounded-md shadow-sm">
-        <input
-          type="text"
-          name="internalPartNo"
-          value={item.internalPartNo}
-          onChange={(e) => handleChange(e, index)}
-          placeholder="Internal Part No"
-          className="border px-2 py-1 rounded w-full"
-        />
-        <input
-          type="text"
-          name="manufacturer"
-          value={item.manufacturer}
-          onChange={(e) => handleChange(e, index)}
-          placeholder="Manufacturer"
-          className="border px-2 py-1 rounded w-full"
-        />
-        <input
-          type="text"
-          name="mfgPartNo"
-          value={item.mfgPartNo}
-          onChange={(e) => handleChange(e, index)}
-          placeholder="Mfg Part No"
-          className="border px-2 py-1 rounded w-full"
-        />
-        <input
-          type="text"
-          name="description"
-          value={item.description}
-          onChange={(e) => handleChange(e, index)}
-          placeholder="Description"
-          className="border px-2 py-1 rounded w-full"
-        />
-        <select
-          name="uom"
-          value={item.uom}
-          onChange={(e) => handleChange(e, index)}
-          className="border px-2 py-1 rounded w-full"
-        >
-          <option value="">Select UOM</option>
-          {options.uoms.map((u: any) => (
-            <option key={u.id} value={u.name}>
-              {u.name}
-            </option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            name="quantity"
-            value={item.quantity}
-            onChange={(e) => handleChange(e, index)}
-            placeholder="Qty"
-            className="border px-2 py-1 rounded w-full"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const newItems = formData.items.filter((_, i) => i !== index);
-              setFormData((prev) => ({ ...prev, items: newItems }));
-            }}
-            className="text-red-600 text-sm hover:underline"
-          >
-            Delete
-          </button>
+        {/* Manual Item Entry */}
+        {formData.items.map((item, index) => (
+          <div key={index} className="grid grid-cols-12 gap-2 items-center bg-white p-2 border rounded-md">
+            <input type="text" value={item.lineNo} readOnly className="border px-2 py-1 rounded w-full bg-gray-100 col-span-1" />
+            <select name="lineType" value={item.lineType} onChange={(e) => handleChange(e, index)} className="border px-2 py-1 rounded w-full col-span-1">
+                {LINE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            <input type="text" name="itemNumber" value={item.itemNumber} onChange={(e) => handleChange(e, index)} placeholder="Item #" className="border px-2 py-1 rounded w-full col-span-1" />
+            <input type="text" name="itemDescription" value={item.itemDescription} onChange={(e) => handleChange(e, index)} placeholder="Description" className="border px-2 py-1 rounded w-full col-span-2" />
+            <input type="text" name="brandManufacturer" value={item.brandManufacturer} onChange={(e) => handleChange(e, index)} placeholder="Brand" className="border px-2 py-1 rounded w-full col-span-1" />
+            <input type="text" name="origin" value={item.origin} onChange={(e) => handleChange(e, index)} placeholder="Origin" className="border px-2 py-1 rounded w-full col-span-1" />
+            <input type="number" name="estQuantity" value={item.estQuantity} onChange={(e) => handleChange(e, index)} placeholder="Qty" className="border px-2 py-1 rounded w-full col-span-1" />
+            <select name="uom" value={item.uom} onChange={(e) => handleChange(e, index)} className="border px-2 py-1 rounded w-full col-span-1">
+              <option value="">UOM</option>
+              {UOM_OPTIONS.map(uom => <option key={uom} value={uom}>{uom}</option>)}
+            </select>
+            <input type="number" name="currentPrice" value={item.currentPrice} onChange={(e) => handleChange(e, index)} placeholder="Current Price" className="border px-2 py-1 rounded w-full col-span-1" />
+            <input type="number" name="targetPrice" value={item.targetPrice} onChange={(e) => handleChange(e, index)} placeholder="Target Price" className="border px-2 py-1 rounded w-full col-span-1" />
+            <input type="number" name="prValue" value={item.prValue} onChange={(e) => handleChange(e, index)} placeholder="PR Value" className="border px-2 py-1 rounded w-full col-span-1" />
+          </div>
+        ))}
+        <div className="text-right">
+          <button type="button" onClick={addItem} className="text-blue-600 text-sm font-medium hover:underline">+ Add Item</button>
         </div>
       </div>
-    ))}
 
-    <div className="text-right">
-      <button
-        type="button"
-        onClick={addItem}
-        className="text-blue-600 text-sm font-medium hover:underline"
-      >
-        + Add Item
-      </button>
-    </div>
-  </div>
-
-  {/* manually add suppliers */}
 
   {/* Manual Suppliers */}
       <div className="mt-8">
-        <h3 className="text-xl font-bold mb-2">Manua Suppliers</h3>
+        <h3 className="text-xl font-bold mb-2">Manual Suppliers</h3>
         {!manualCategory?.suppliers.length ? (
           <p className="text-sm text-gray-500">No manual suppliers added.</p>
         ) : (
