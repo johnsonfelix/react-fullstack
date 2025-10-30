@@ -27,7 +27,7 @@ export default function AdminSupplierList() {
 
   const fetchSuppliers = async () => {
     try {
-      const res = await fetch('/api/supplier?adminView=true', { cache: 'no-store' });
+      const res = await fetch('/api/supplier', { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load suppliers');
       const data = await res.json();
       setSuppliers(data || []);

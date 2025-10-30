@@ -21,7 +21,6 @@ frontend:
           EMAIL_USER="$EMAIL_USER"
           EMAIL_PASS="$EMAIL_PASS"
           JWT_SECRET="$JWT_SECRET"
-          NEXT_PUBLIC_BASE_URL="$NEXT_PUBLIC_BASE_URL"
           EOF
         # Optionally export vars for process.env at build step
         - export $(grep -v '^#' .env.production | xargs)
