@@ -25,16 +25,24 @@ export default function AdminSupplierList() {
     fetchSuppliers();
   }, []);
 
-  const fetchSuppliers = async () => {
-    try {
-      const res = await fetch('/api/supplier', { cache: 'no-store' });
-      if (!res.ok) throw new Error('Failed to load suppliers');
-      const data = await res.json();
-      setSuppliers(data || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+ const fetchSuppliers = async () => {
+  try {
+    const res = await fetch('/api/supplier', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load suppliers');
+    const json = await res.json();
+
+    // Accept either an array (legacy) or { data: [...], meta: {...} } (new)
+    const supplierList = Array.isArray(json)
+      ? json
+      : Array.isArray(json.data)
+      ? json.data
+      : [];
+
+    setSuppliers(supplierList);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   // helper to set loading per supplier
   const setLoadingFor = (id: string, v: boolean) => setLoadingMap(prev => ({ ...prev, [id]: v }));
