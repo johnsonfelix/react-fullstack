@@ -1,11 +1,17 @@
-// /app/api/administration/questionnaire-templates/route.ts
+// app/api/administration/questionnaire-templates/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/app/prisma";
 import fs from "fs/promises";
 import path from "path";
 import { Prisma } from "@prisma/client";
 
-type IncomingAttachment = { filename?: string; url?: string; data?: string; mimeType?: string };
+type IncomingAttachment = {
+  filename?: string;
+  url?: string;
+  data?: string;
+  mimeType?: string;
+};
+
 type IncomingQuestion = {
   text: string;
   description?: string | null;
@@ -15,11 +21,12 @@ type IncomingQuestion = {
   options?: any;
   attachments?: IncomingAttachment[] | string[];
   subQuestions?: IncomingQuestion[];
-  // optional: allow attaching a category id to a question (matches schema)
   categoryId?: string | null;
+  validation?: any;              // ⬅️ include validation JSON
+  conditionalOn?: string | null; // optional (not required if you’re only using validation)
 };
 
-// Persist base64 attachments -> returns array of URL strings
+// If you still want to support base64 attachments saved to /public/uploads/questionnaire
 async function persistAttachmentsForQuestion(q: IncomingQuestion): Promise<string[]> {
   if (!q.attachments || (Array.isArray(q.attachments) && q.attachments.length === 0)) return [];
 
@@ -71,16 +78,15 @@ function toQuestionCreatePayload(q: IncomingQuestion, idxOrder = 0) {
     order: typeof q.order === "number" ? q.order : idxOrder,
     options: typeof q.options !== "undefined" ? q.options : null,
     attachments: Array.isArray(q.attachments) ? (q.attachments as string[]) : [],
-    // pass through question-level category if provided
     categoryId: q.categoryId ?? null,
+    validation: q.validation ?? null, // ⬅️ carry through
   };
   return payload;
 }
 
-// Helper: build a nested include to 3 levels deep (top-level -> subQuestions -> subQuestions)
 const QUESTION_NESTED_INCLUDE = {
   questions: {
-    where: { parentQuestionId: null },        // top-level only
+    where: { parentQuestionId: null },
     orderBy: { order: "asc" },
     include: {
       subQuestions: {
@@ -90,14 +96,14 @@ const QUESTION_NESTED_INCLUDE = {
             orderBy: { order: "asc" },
             include: {
               subQuestions: {
-                orderBy: { order: "asc" }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+                orderBy: { order: "asc" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
 } as Prisma.QuestionnaireTemplateInclude;
 
 export async function POST(req: Request) {
@@ -106,34 +112,48 @@ export async function POST(req: Request) {
     const {
       name,
       description,
-      questions,
+      sections,
+      questions,       // legacy support: if you still send a flat array
       categoryId,
       categoryName,
     } = body as {
       name?: string;
       description?: string | null;
-      questions?: IncomingQuestion[];
+      sections?: { questions: IncomingQuestion[] }[];
+      questions?: IncomingQuestion[]; // legacy
       categoryId?: string | null;
       categoryName?: string | null;
     };
 
-    if (!name || !name.trim()) return NextResponse.json({ error: "Template name is required" }, { status: 400 });
-    if (!Array.isArray(questions) || questions.length === 0) return NextResponse.json({ error: "At least one question is required" }, { status: 400 });
+    if (!name || !name.trim())
+      return NextResponse.json({ error: "Template name is required" }, { status: 400 });
 
-    // CATEGORY handling: either categoryId (existing) OR categoryName (find/create)
+    // Flatten questions from sections OR legacy questions
+    let incomingQuestions: IncomingQuestion[] = [];
+    if (Array.isArray(sections) && sections.length > 0) {
+      for (const s of sections) {
+        if (Array.isArray(s.questions)) incomingQuestions.push(...s.questions);
+      }
+    } else if (Array.isArray(questions)) {
+      incomingQuestions = questions;
+    }
+
+    if (!Array.isArray(incomingQuestions) || incomingQuestions.length === 0)
+      return NextResponse.json({ error: "At least one question is required" }, { status: 400 });
+
+    // Category handling
     if (!categoryId && !categoryName) {
       return NextResponse.json({ error: "categoryId or categoryName is required" }, { status: 400 });
     }
 
     const trimmedCategoryName = typeof categoryName === "string" ? categoryName.trim() : null;
-    if (!categoryId && !trimmedCategoryName) {
-      return NextResponse.json({ error: "categoryId or categoryName is required" }, { status: 400 });
-    }
-
     let category = null;
+
     if (categoryId) {
       category = await prisma.questionnaireCategory.findUnique({ where: { id: categoryId } });
-      if (!category) return NextResponse.json({ error: "Provided categoryId not found" }, { status: 400 });
+      if (!category) {
+        return NextResponse.json({ error: "Provided categoryId not found" }, { status: 400 });
+      }
     } else if (trimmedCategoryName) {
       category = await prisma.questionnaireCategory.findFirst({ where: { name: trimmedCategoryName } });
       if (!category) {
@@ -141,9 +161,7 @@ export async function POST(req: Request) {
       }
     }
 
-    
-
-    // persist attachments (in-place) and convert each question.attachments -> string[]
+    // Persist any base64 attachments to disk (if still used)
     async function walkAndPersist(qs?: IncomingQuestion[]) {
       if (!qs) return;
       for (const q of qs) {
@@ -158,24 +176,23 @@ export async function POST(req: Request) {
         }
       }
     }
-    await walkAndPersist(questions);
-    
-// 1) create the template connected to the category
+    await walkAndPersist(incomingQuestions);
+
+    // Create template
     const template = await prisma.questionnaireTemplate.create({
       data: {
         name: name.trim(),
         description: description ?? null,
-        category: { connect: { id: category.id } }, // category guaranteed non-null here
+        category: { connect: { id: category!.id } },
       },
     });
 
-    // 2) recursively create QuestionnaireQuestion rows — build explicit create data (avoid passing both scalar FK and relation)
+    // Recursively create questions
     async function createQuestionsRecursive(qs: IncomingQuestion[], parentQuestionId: string | null = null) {
       for (let i = 0; i < qs.length; i++) {
         const q = qs[i];
         const payload = toQuestionCreatePayload(q, i);
 
-        // build explicit data object instead of spreading payload
         const questionData: any = {
           text: payload.text,
           description: payload.description,
@@ -184,6 +201,7 @@ export async function POST(req: Request) {
           order: payload.order,
           options: payload.options,
           attachments: payload.attachments || [],
+          validation: payload.validation ?? null, // ⬅️ save validation JSON rule
           template: { connect: { id: template.id } },
         };
 
@@ -191,7 +209,6 @@ export async function POST(req: Request) {
           questionData.parentQuestion = { connect: { id: parentQuestionId } };
         }
 
-        // If question has a categoryId, connect via relation (don't also set scalar categoryId)
         if (payload.categoryId) {
           const qCat = await prisma.questionnaireCategory.findUnique({ where: { id: payload.categoryId } });
           if (qCat) {
@@ -207,14 +224,13 @@ export async function POST(req: Request) {
       }
     }
 
-    await createQuestionsRecursive(questions);
+    await createQuestionsRecursive(incomingQuestions);
 
-    // 3) fetch the template back including top-level questions (ordered) and category
+    // Return created template
     const created = await prisma.questionnaireTemplate.findUnique({
       where: { id: template.id },
       include: {
         category: true,
-        // include nested questions (top-level -> subQuestions -> subQuestions)
         ...QUESTION_NESTED_INCLUDE,
       },
     });

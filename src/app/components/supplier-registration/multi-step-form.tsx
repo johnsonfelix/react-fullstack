@@ -27,6 +27,7 @@ import {
   supplierRegistrationSchema,
   SupplierRegistrationFormValues,
 } from "@/app/lib/zod-schemas/supplier-registration-schema";
+import { deleteS3Files } from "@/app/lib/deleteS3Files";
 
 type FormValues = z.infer<typeof supplierRegistrationSchema>;
 
@@ -103,6 +104,9 @@ export default function MultiStepForm({ verifiedEmail }: MultiStepFormProps) {
     defaultValues: initialValues,
     mode: "onTouched",
   });
+
+  const allQuestionnaireComplete = methods.watch("questionnaire.__allComplete", false);
+
 
   const {
     handleSubmit,
@@ -243,13 +247,11 @@ export default function MultiStepForm({ verifiedEmail }: MultiStepFormProps) {
   };
 
   // SAVE PROGRESS
- // Replace existing handleSaveProgress with this function inside MultiStepForm
 const handleSaveProgress = async () => {
   const allValues = getValues();
   const dirtyData = getDirtyValues(dirtyFields as any, allValues);
 
   // define which top-level keys are allowed to be saved for each step index
-  // step index corresponds to your `steps` array
   const allowedByStep: string[][] = [
     ["companyDetails"], // step 0 -> only company details
     ["companyDetails", "contacts"], // step 1 -> company + contacts
@@ -262,7 +264,6 @@ const handleSaveProgress = async () => {
 
   const allowed = allowedByStep[currentStep] ?? allowedByStep[allowedByStep.length - 1];
 
-  // Helper: pick only allowed keys from an object
   const pickAllowed = (src: Record<string, any>) => {
     const out: Record<string, any> = {};
     for (const k of Object.keys(src)) {
@@ -271,29 +272,43 @@ const handleSaveProgress = async () => {
     return out;
   };
 
-  // If dirtyData contains things, filter them down to allowed keys only
   let payloadBody: Record<string, any> = {};
   if (Object.keys(dirtyData).length > 0) {
     payloadBody = pickAllowed(dirtyData);
 
-    // If arrays are expected but not present in dirtyData and they exist in allValues,
-    // include them only if they are allowed for the current step (keeps previous behaviour)
     const arrayFields = ["contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"];
     for (const arrField of arrayFields) {
+      // If allowed and not present in payload, add the full array
       if (allowed.includes(arrField) && !(arrField in payloadBody) && Array.isArray(allValues[arrField]) && allValues[arrField].length > 0) {
-        // include full array only if it belongs to allowed set
         payloadBody[arrField] = allValues[arrField];
       }
     }
+
+    // ---- NEW: For any arrays we are PATCHING (i.e. present in payloadBody),
+    // merge partial items with the full item from allValues by index (if available)
+    // so server doesn't receive tiny partial objects that replace the whole array.
+    const arrayFieldsToNormalize = ["contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"];
+    for (const arrField of arrayFieldsToNormalize) {
+      if (!Array.isArray(payloadBody[arrField])) continue;
+      const originalArray = Array.isArray(allValues[arrField]) ? allValues[arrField] : [];
+      payloadBody[arrField] = payloadBody[arrField]
+        .map((it: any, idx: number) => {
+          if (!it || typeof it !== "object") return it;
+          // If the item already has an id (or Id) assume it's an intended patch and keep it
+          if (it.id != null || it.Id != null) return it;
+          // Otherwise merge with the corresponding full item from the form by index (fallback to item)
+          const full = originalArray[idx] ?? {};
+          return { ...full, ...it };
+        })
+        // remove any accidental null/undefined items
+        .filter(Boolean);
+    }
   } else {
-    // No explicit dirty keys -> do NOT send entire form.
-    // Instead send only the allowed subset from allValues (so step 0 won't send contacts)
     for (const key of allowed) {
       if (allValues[key] !== undefined) payloadBody[key] = allValues[key];
     }
   }
 
-  // If after filtering there's nothing to save, skip the network call
   if (Object.keys(payloadBody).length === 0) {
     alert("Nothing to save for this step.");
     return;
@@ -319,6 +334,26 @@ const handleSaveProgress = async () => {
     // Reset form dirty state to current values
     reset(getValues());
     if (result.savedData?.completedSteps) setCompletedSteps(result.savedData.completedSteps);
+
+    // ===== AFTER SUCCESSFUL SAVE: perform S3 deletions for questionnaire-marked files =====
+    try {
+      const filesToDelete = (getValues()?.questionnaire?.__filesToDelete) ?? [];
+      if (Array.isArray(filesToDelete) && filesToDelete.length > 0) {
+        // Call delete helper
+        const delRes = await deleteS3Files(filesToDelete);
+        if (!delRes.ok) {
+          console.warn("Some S3 deletions failed:", delRes);
+          // Optionally: store delRes.data for retry, or surface to user
+        } else {
+          // On success, clear deletion list from form so we don't re-delete
+          setValue("questionnaire.__filesToDelete", [], { shouldDirty: false });
+        }
+      }
+    } catch (err) {
+      console.error("Error deleting marked S3 files after save:", err);
+    }
+    // ===== end S3 deletion block =====
+
   } catch (err: any) {
     alert(`Save failed: ${err.message}`);
     console.error("Save error details:", err);
@@ -437,17 +472,36 @@ const handleSaveProgress = async () => {
                   </>
                 ) : (
                   <>
-                    <Button type="button" variant="secondary" onClick={handleSaveProgress} disabled={isSubmitting}>
-                      Save Progress
-                    </Button>
                     <Button
-                      type="button"
-                      className={`bg-green-600 hover:bg-green-700 ${isSubmitting ? "opacity-60 cursor-not-allowed" : ""}`}
-                      onClick={submitRegistration}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? "Submitting..." : "Submit Registration"}
-                    </Button>
+  type="button"
+  variant="secondary"
+  onClick={handleSaveProgress}
+  disabled={isSubmitting}
+>
+  Save Progress
+</Button>
+
+<Button
+  type="button"
+  className={`bg-green-600 hover:bg-green-700 ${
+    isSubmitting || !allQuestionnaireComplete ? "opacity-60 cursor-not-allowed" : ""
+  }`}
+  onClick={async () => {
+    if (!allQuestionnaireComplete) {
+      alert("Please complete all questionnaire sections before submitting.");
+      return;
+    }
+    await submitRegistration();
+  }}
+  disabled={isSubmitting || !allQuestionnaireComplete}
+  title={
+    !allQuestionnaireComplete
+      ? "Complete all questionnaire sections to enable submission"
+      : undefined
+  }
+>
+  {isSubmitting ? "Submitting..." : "Submit Registration"}
+</Button>
                   </>
                 )}
               </div>

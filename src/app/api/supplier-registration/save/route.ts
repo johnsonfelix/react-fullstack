@@ -167,12 +167,12 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Clear old child rows (businessDocument, address, bankAccount, contact) and supplierCategory join rows
+      // Clear old child rows (businessDocument, address, bankAccount, contact)
       await tx.businessDocument.deleteMany({ where: { supplierId: supplier.id } });
       await tx.address.deleteMany({ where: { supplierId: supplier.id } });
       await tx.bankAccount.deleteMany({ where: { supplierId: supplier.id } });
       await tx.contact.deleteMany({ where: { supplierId: supplier.id } });
-      await tx.supplierCategory.deleteMany({ where: { supplierId: supplier.id } });
+      // NOTE: supplierCategory deletion is now conditional below based on whether client provided productsAndServices
 
       // Create business documents
       const createdBusinessDocuments: any[] = [];
@@ -266,33 +266,33 @@ export async function POST(req: NextRequest) {
       finalData.bankAccounts = createdBankAccounts;
 
       // Create contacts (NEW)
-     const createdContacts: any[] = [];
-if (Array.isArray(finalData.contacts) && finalData.contacts.length > 0) {
-  for (const c of finalData.contacts) {
-    const dataForCreate = {
-      firstName: c.firstName ?? "",
-      lastName: c.lastName ?? "",
-      email: c.email ?? "",
-      designation: c.designation ?? null,
-      countryCode: c.country ?? c.countryCode ?? "IN",
-      mobile: c.mobile ?? null,
-      phone: c.phone ?? null,
-      ext: c.ext ?? null,
-      isAdministrativeContact: !!c.isAdministrativeContact,
-      needsUserAccount: !!c.needsUserAccount,
-      // Connect the supplier relation instead of relying on a scalar supplierId
-      supplier: { connect: { id: supplier.id } },
-    };
+      const createdContacts: any[] = [];
+      if (Array.isArray(finalData.contacts) && finalData.contacts.length > 0) {
+        for (const c of finalData.contacts) {
+          const dataForCreate = {
+            firstName: c.firstName ?? "",
+            lastName: c.lastName ?? "",
+            email: c.email ?? "",
+            designation: c.designation ?? null,
+            countryCode: c.country ?? c.countryCode ?? "IN",
+            mobile: c.mobile ?? null,
+            phone: c.phone ?? null,
+            ext: c.ext ?? null,
+            isAdministrativeContact: !!c.isAdministrativeContact,
+            needsUserAccount: !!c.needsUserAccount,
+            // Connect the supplier relation instead of relying on a scalar supplierId
+            supplier: { connect: { id: supplier.id } },
+          };
 
-    // Skip obviously empty contact entries
-    const isEmptyContact = !dataForCreate.email && !dataForCreate.firstName && !dataForCreate.mobile;
-    if (isEmptyContact) continue;
+          // Skip obviously empty contact entries
+          const isEmptyContact = !dataForCreate.email && !dataForCreate.firstName && !dataForCreate.mobile;
+          if (isEmptyContact) continue;
 
-    const created = await tx.contact.create({ data: dataForCreate });
-    createdContacts.push(created);
-  }
-}
-finalData.contacts = createdContacts;
+          const created = await tx.contact.create({ data: dataForCreate });
+          createdContacts.push(created);
+        }
+      }
+      finalData.contacts = createdContacts;
 
       // Normalize productsAndServices to array of strings
       if (Array.isArray(finalData.productsAndServices)) {
@@ -403,29 +403,39 @@ finalData.contacts = createdContacts;
       }
 
       // Create supplierCategory join rows
-      const createdSupplierCategories: any[] = [];
-      if (Array.isArray(finalData.productsAndServices) && finalData.productsAndServices.length > 0) {
-        for (const catId of finalData.productsAndServices) {
-          if (!catId) continue;
-          const pc = await tx.productCategory.findUnique({ where: { id: String(catId) } });
-          if (!pc) {
-            console.warn("Skipping unknown product category id:", catId);
-            continue;
-          }
-          try {
-            const created = await tx.supplierCategory.create({
-              data: {
-                supplierId: supplier.id,
-                categoryId: String(catId),
-              },
-            });
-            createdSupplierCategories.push(created);
-          } catch (err) {
-            console.warn("Failed to create supplierCategory for id:", catId, err);
+      // --- NEW: only replace supplier categories when client explicitly provided productsAndServices ---
+      const clientProvidedProducts = Object.prototype.hasOwnProperty.call(parsed.data, "productsAndServices");
+      if (clientProvidedProducts) {
+        // clear old supplierCategory join rows for fresh recreation
+        await tx.supplierCategory.deleteMany({ where: { supplierId: supplier.id } });
+
+        const createdSupplierCategories: any[] = [];
+        if (Array.isArray(finalData.productsAndServices) && finalData.productsAndServices.length > 0) {
+          for (const catId of finalData.productsAndServices) {
+            if (!catId) continue;
+            const pc = await tx.productCategory.findUnique({ where: { id: String(catId) } });
+            if (!pc) {
+              console.warn("Skipping unknown product category id:", catId);
+              continue;
+            }
+            try {
+              const created = await tx.supplierCategory.create({
+                data: {
+                  supplierId: supplier.id,
+                  categoryId: String(catId),
+                },
+              });
+              createdSupplierCategories.push(created);
+            } catch (err) {
+              console.warn("Failed to create supplierCategory for id:", catId, err);
+            }
           }
         }
+        finalData.productCategories = createdSupplierCategories;
+      } else {
+        // preserve existing productCategories if client didn't provide productsAndServices
+        finalData.productCategories = existing?.productCategories ?? [];
       }
-      finalData.productCategories = createdSupplierCategories;
 
       // FINAL SUBMIT: set registration status & friendly reference if requested
       if (isFinalSubmit) {
