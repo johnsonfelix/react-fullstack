@@ -24,6 +24,8 @@ frontend:
           S3_UPLOAD_REGION="$S3_UPLOAD_REGION"
           S3_UPLOAD_BUCKET="$S3_UPLOAD_BUCKET"
           S3_UPLOAD_PREFIX="$S3_UPLOAD_PREFIX"
+          AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+          AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
           EOF
         # Optionally export vars for process.env at build step
         - export $(grep -v '^#' .env.production | xargs)
