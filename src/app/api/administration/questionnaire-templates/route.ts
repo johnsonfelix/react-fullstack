@@ -22,48 +22,72 @@ type IncomingQuestion = {
   attachments?: IncomingAttachment[] | string[];
   subQuestions?: IncomingQuestion[];
   categoryId?: string | null;
-  validation?: any;              // ⬅️ include validation JSON
-  conditionalOn?: string | null; // optional (not required if you’re only using validation)
+  validation?: any;
+  conditionalOn?: string | null;
 };
 
-// If you still want to support base64 attachments saved to /public/uploads/questionnaire
+// Modified to handle both local (dev) and S3 (production) attachments
 async function persistAttachmentsForQuestion(q: IncomingQuestion): Promise<string[]> {
   if (!q.attachments || (Array.isArray(q.attachments) && q.attachments.length === 0)) return [];
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "questionnaire");
-  await fs.mkdir(uploadDir, { recursive: true });
-
   const outUrls: string[] = [];
 
+  // If already an array of strings (URLs), return as-is
   if (Array.isArray(q.attachments) && q.attachments.every((a) => typeof a === "string")) {
     return q.attachments as string[];
   }
 
   for (const att of (q.attachments as IncomingAttachment[]) || []) {
     if (!att) continue;
+    
+    // If it's already a string URL, use it
     if (typeof att === "string") {
       outUrls.push(att);
       continue;
     }
+    
+    // ✅ FIX: If attachment has S3 URL (no data), use it directly
     if (att.url && !att.data) {
       outUrls.push(att.url);
       continue;
     }
-    if (!att.data) continue;
+    
+    // ✅ FIX: Only persist base64 if NOT in production (Amplify)
+    // Check if we're in a serverless/read-only environment
+    const isServerless = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL;
+    
+    if (att.data && !isServerless) {
+      // Local development: save to /public/uploads
+      try {
+        const uploadDir = path.join(process.cwd(), "public", "uploads", "questionnaire");
+        await fs.mkdir(uploadDir, { recursive: true });
 
-    const parts = att.data.split("base64,");
-    if (parts.length !== 2) continue;
-    const prefix = parts[0];
-    const b64 = parts[1];
-    const mimeMatch = prefix.match(/^data:([^;]+);/);
-    const mime = mimeMatch?.[1] ?? att.mimeType ?? "application/octet-stream";
-    const ext = (mime.split("/")[1] || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 6) || "bin";
+        const parts = att.data.split("base64,");
+        if (parts.length !== 2) continue;
+        
+        const prefix = parts[0];
+        const b64 = parts[1];
+        const mimeMatch = prefix.match(/^data:([^;]+);/);
+        const mime = mimeMatch?.[1] ?? att.mimeType ?? "application/octet-stream";
+        const ext = (mime.split("/")[1] || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 6) || "bin";
 
-    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const filePath = path.join(uploadDir, safeName);
-    const buffer = Buffer.from(b64, "base64");
-    await fs.writeFile(filePath, buffer);
-    outUrls.push(`/uploads/questionnaire/${safeName}`);
+        const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const filePath = path.join(uploadDir, safeName);
+        const buffer = Buffer.from(b64, "base64");
+        await fs.writeFile(filePath, buffer);
+        
+        outUrls.push(`/uploads/questionnaire/${safeName}`);
+      } catch (err) {
+        console.error("Failed to persist attachment locally:", err);
+        // Skip this attachment if it fails
+        continue;
+      }
+    } else if (att.data && isServerless) {
+      // ⚠️ Production: base64 data should have been uploaded to S3 already
+      console.warn("Base64 data received in serverless environment but no URL provided. Skipping attachment.");
+      // You should handle this on the client side - upload to S3 first, then send URL
+      continue;
+    }
   }
 
   return outUrls;
@@ -79,7 +103,7 @@ function toQuestionCreatePayload(q: IncomingQuestion, idxOrder = 0) {
     options: typeof q.options !== "undefined" ? q.options : null,
     attachments: Array.isArray(q.attachments) ? (q.attachments as string[]) : [],
     categoryId: q.categoryId ?? null,
-    validation: q.validation ?? null, // ⬅️ carry through
+    validation: q.validation ?? null,
   };
   return payload;
 }
@@ -113,14 +137,14 @@ export async function POST(req: Request) {
       name,
       description,
       sections,
-      questions,       // legacy support: if you still send a flat array
+      questions,
       categoryId,
       categoryName,
     } = body as {
       name?: string;
       description?: string | null;
       sections?: { questions: IncomingQuestion[] }[];
-      questions?: IncomingQuestion[]; // legacy
+      questions?: IncomingQuestion[];
       categoryId?: string | null;
       categoryName?: string | null;
     };
@@ -161,7 +185,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Persist any base64 attachments to disk (if still used)
+    // Process attachments (will use S3 URLs in production, local files in dev)
     async function walkAndPersist(qs?: IncomingQuestion[]) {
       if (!qs) return;
       for (const q of qs) {
@@ -201,7 +225,7 @@ export async function POST(req: Request) {
           order: payload.order,
           options: payload.options,
           attachments: payload.attachments || [],
-          validation: payload.validation ?? null, // ⬅️ save validation JSON rule
+          validation: payload.validation ?? null,
           template: { connect: { id: template.id } },
         };
 
@@ -238,7 +262,7 @@ export async function POST(req: Request) {
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     console.error("Create template error:", err?.message ?? err, err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error", details: err?.message }, { status: 500 });
   }
 }
 
