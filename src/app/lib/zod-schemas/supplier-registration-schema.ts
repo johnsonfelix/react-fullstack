@@ -118,6 +118,7 @@ export const supplierRegistrationSchema = z.object({
   taxRegistrationNumber: z.string().optional(),
   noteToApprover: z.string().optional(),
   businessDocuments: z.array(businessDocumentSchema).optional(),
+  profileAttachments: z.array(z.string()).optional().default([]),
 }),
 
   contacts: z.array(contactSchema).min(1, { message: "At least one contact is required." }),

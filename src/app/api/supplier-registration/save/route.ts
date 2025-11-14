@@ -153,6 +153,8 @@ export async function POST(req: NextRequest) {
           tradeLicenseNumber: parsed.data.companyDetails?.tradeLicenseNumber ?? existing?.tradeLicenseNumber,
           taxRegistrationNumber: parsed.data.companyDetails?.taxRegistrationNumber ?? existing?.taxRegistrationNumber,
           noteToApprover: parsed.data.companyDetails?.noteToApprover ?? existing?.noteToApprover,
+          profileAttachments: parsed.data.companyDetails?.profileAttachments ?? existing?.profileAttachments ?? [],
+
         },
         create: {
           registrationEmail: verifiedEmail,
@@ -164,6 +166,7 @@ export async function POST(req: NextRequest) {
           tradeLicenseNumber: parsed.data.companyDetails?.tradeLicenseNumber ?? existing?.tradeLicenseNumber ?? null,
           taxRegistrationNumber: parsed.data.companyDetails?.taxRegistrationNumber ?? existing?.taxRegistrationNumber ?? null,
           noteToApprover: parsed.data.companyDetails?.noteToApprover ?? existing?.noteToApprover ?? null,
+          profileAttachments: parsed.data.companyDetails?.profileAttachments ?? [],
         },
       });
 

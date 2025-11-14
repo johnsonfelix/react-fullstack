@@ -231,28 +231,32 @@ export async function GET(req: NextRequest) {
 
     // Build final response object
     const formattedData: any = {
-      saved: Boolean(!!supplierData),
-      verifiedEmail: email,
-      companyDetails: {
-        companyName: supplierData?.companyName ?? "",
-        website: supplierData?.website ?? "",
-        country: supplierData?.country ?? "",
-        tradeLicenseNumber: supplierData?.tradeLicenseNumber ?? "",
-        taxRegistrationNumber: supplierData?.taxRegistrationNumber ?? "",
-        organizationType: supplierData?.organizationType ?? "",
-        supplierType: supplierData?.supplierType ?? "",
-        noteToApprover: supplierData?.noteToApprover ?? "",
-        businessDocuments: businessDocuments.length > 0 ? businessDocuments : undefined,
-      },
-      contacts,
-      addresses,
-      businessDocuments,
-      bankAccounts: bankAccounts.length > 0 ? bankAccounts : undefined,
-      productsAndServices: productCategoryIds,
-      questionnaire: questionnaireAnswersMap,
-      questions,
-      completedSteps: uniqueSortedCompleted,
-    };
+  saved: Boolean(!!supplierData),
+  verifiedEmail: email,
+  companyDetails: {
+    companyName: supplierData?.companyName ?? "",
+    website: supplierData?.website ?? "",
+    country: supplierData?.country ?? "",
+    tradeLicenseNumber: supplierData?.tradeLicenseNumber ?? "",
+    taxRegistrationNumber: supplierData?.taxRegistrationNumber ?? "",
+    organizationType: supplierData?.organizationType ?? "",
+    supplierType: supplierData?.supplierType ?? "",
+    noteToApprover: supplierData?.noteToApprover ?? "",
+    // ADD THIS LINE:
+    profileAttachments: Array.isArray(supplierData?.profileAttachments) 
+      ? supplierData.profileAttachments 
+      : [],
+    businessDocuments: businessDocuments.length > 0 ? businessDocuments : undefined,
+  },
+  contacts,
+  addresses,
+  businessDocuments,
+  bankAccounts: bankAccounts.length > 0 ? bankAccounts : undefined,
+  productsAndServices: productCategoryIds,
+  questionnaire: questionnaireAnswersMap,
+  questions,
+  completedSteps: uniqueSortedCompleted,
+};
 
     return NextResponse.json(formattedData, { status: 200 });
   } catch (err) {
