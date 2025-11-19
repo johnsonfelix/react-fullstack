@@ -1,5 +1,6 @@
 // app/api/admin/workflow/award/route.ts
 import { NextResponse } from 'next/server';
+import prisma from "@/app/prisma";
 
 export const dynamic = 'force-dynamic';
 const WORKFLOW_NAME = 'default_award_workflow';
