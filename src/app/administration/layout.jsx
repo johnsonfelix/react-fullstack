@@ -13,10 +13,15 @@ const links = [
   // { href: '/administration/supplier-groups', label: 'Supplier Groups', icon: <Users size={18} /> },
   { href: '/administration/projects', label: 'Projects', icon: <Folder size={18} /> },
   { href: '/administration/fields/currency', label: 'Currency', icon: <DollarSign size={18} /> },
+  { href: '/administration/fields/incoterms', label: 'Incoterms', icon: <DollarSign size={18} /> },
+  { href: '/administration/fields/serviceType', label: 'Service Type', icon: <DollarSign size={18} /> },
+  { href: '/administration/fields/carrier', label: 'Carrier', icon: <DollarSign size={18} /> },
   { href: '/administration/fields/uom', label: 'UOM', icon: <Weight size={18} /> },
   { href: '/administration/fields/payment', label: 'Payment', icon: <CreditCard size={18} /> },
   { href: '/administration/fields/urgency', label: 'Urgency', icon: <Folder size={18} /> },
   { href: '/administration/fields/shipping', label: 'Shipping', icon: <Ship size={18} /> },
+  { href: '/administration/rfq', label: 'Manage RFQ', icon: <Ship size={18} /> },
+  { href: '/administration/rfq/workflow', label: 'RFQ Rules', icon: <Ship size={18} /> },
 ];
 
 export default function AdminLayout({ children }) {

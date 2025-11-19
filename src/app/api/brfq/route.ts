@@ -88,6 +88,8 @@ export async function POST(req: NextRequest) {
     // Extract IDs and Emails separately
     const supplierIds = body.suppliersSelected.map((s: any) => s.id);
     const supplierEmails = body.suppliersSelected.map((s: any) => s.email).filter(Boolean);
+    const supplierObjects = Array.isArray(body.suppliersSelected) ? body.suppliersSelected : [];
+
 
     const createdBRFQ = await prisma.bRFQ.create({
       data: {
@@ -106,7 +108,7 @@ export async function POST(req: NextRequest) {
         customerCategory: body.categoryIds,
         notesToSupplier: body.noteToSupplier || '',
         productSpecification: body.productSpecification || '',
-        suppliersSelected: supplierIds,
+        suppliersSelected: supplierObjects,
         attachmentPath: attachmentPath || null,
       },
     });

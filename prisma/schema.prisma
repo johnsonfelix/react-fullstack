@@ -331,6 +331,27 @@ model Currency {
   updatedAt DateTime     @updatedAt @map(name: "updated_at")
 }
 
+model Incoterms {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
+model ServiceType {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
+model Carrier {
+  id        String      @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+}
+
 
 model Payment {
   id        String      @id @default(cuid())
@@ -364,8 +385,10 @@ model BRFQ {
   id                    String   @id @default(uuid())
   rfqId                 String   @unique
   title                 String
+  openDate              DateTime?
   closeDate             DateTime
   closeTime             DateTime
+  needByDate            DateTime?
   preferredDeliveryTime String?
   requester             String?
   shippingAddress       String?
@@ -375,9 +398,14 @@ model BRFQ {
   carrier               String?
   urgency               String?
   notesToSupplier       String?
+  incoterms             String?
+  origin                String?
+  currentPrice          String?
+  targetPrice           String?
+  prValue               String?
   productSpecification  String?
   customerCategory      String[]
-  suppliersSelected     String[]
+  suppliersSelected     Json?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -388,6 +416,22 @@ model BRFQ {
 
   // ✅ Add this reverse relation
   quotes                Quote[]  @relation("BRFQToQuotes")
+  modificationRequests  ModificationRequest[]
+  award   Award[]
+
+
+  pauseRequests  PauseRequest[]   // all pause requests created for this BRFQ
+  pauseActions   PauseAction[]    // chronological pause/resume actions
+
+  publishOnApproval     Boolean  @default(false)   // if true, will be published automatically when approved
+  approvalStatus        String   @default("none")  // "none" | "pending" | "approved" | "rejected"
+  approvalRequestedBy   String?                        // user id / username who sent for approval
+  approvalRequestedAt   DateTime?
+  approvedBy            String?
+  approvedAt            DateTime?
+  approvalNote          String?                        // optional note from approver when approving/rejecting
+  published             Boolean  @default(false)      // whether RFQ is published (visible to suppliers)
+  status                String?  
 }
 
 
@@ -537,6 +581,219 @@ model Otp {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Approval workflow models
+model ApprovalRule {
+  id              String               @id @default(cuid())
+  name            String
+  description     String?              // optional human-readable note
+  criteria        Json?                // flexible criteria JSON: { minValue, maxValue, categories, responseVisibility, ... }
+  slaHours        Int?                 // SLA in hours
+  escalationEmail String?              // email to escalate to when SLA breaches
+  autoPublish     Boolean   @default(false)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  approvers       ApprovalApprover[]
+  history         ApprovalHistory[]
+
+  @@map("approval_rules")
+}
+
+model ApprovalApprover {
+  id        String   @id @default(cuid())
+  rule      ApprovalRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  ruleId    String
+  approverId String?   // optional user id or role id in your system
+  role       String?   // e.g. "Procurement Head"
+  email      String?
+  order      Int       @default(1)   // sequence order for approvals
+  isParallel Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+
+  @@map("approval_approvers")
+  @@index([ruleId])
+}
+
+model ApprovalHistory {
+  id          String   @id @default(cuid())
+  ruleId      String
+  rule        ApprovalRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  action      String   // "requested" | "approved" | "rejected" | "escalated"
+  byUser      String?  // user id or name
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@map("approval_history")
+  @@index([ruleId])
+}
+
+model ModificationRequest {
+  id              String   @id @default(cuid())
+  brfqId          String
+  brfq            BRFQ     @relation(fields: [brfqId], references: [id], onDelete: Cascade)
+  requestedBy     String
+  requestedAt     DateTime @default(now())
+  requestedFields String[]  // e.g. ["closeDateTime","items"]
+  summary         Json     // structured diff: { closeDateTime: { from:..., to:... }, items: { from:[], to:[] }, ... }
+  note            String?
+  status          String   @default("pending") // pending|approved|rejected
+  processedBy     String?
+  processedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  approvals       ModificationApprovalHistory[]  // history
+}
+
+model ModificationApprovalHistory {
+  id             String   @id @default(cuid())
+  modificationId String
+  modification   ModificationRequest @relation(fields: [modificationId], references: [id], onDelete: Cascade)
+  action         String   // approve | reject
+  actedBy        String
+  actedAt        DateTime @default(now())
+  note           String?
+}
+
+model AdminModificationConfig {
+  id               String   @id @default(cuid())
+  editableFields   Json     // e.g. { closeDateTime: true, items: true, targetPrice: true, visibility: false }
+  approverList     Json?    // array of approvers with order and parallel flag
+  notifySuppliers  Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ModificationRules {
+  id                         String   @id @default(cuid())
+  name                       String?              // e.g. "Default Modification Rules"
+  fields                     Json                 // array of FieldRule objects
+  approvers                  Json?                // array of approver objects (optional)
+  notifyAllSuppliersOnChange Boolean  @default(true)
+  supplierNotificationSubject String?              // optional template subject
+  supplierNotificationBody    String?              // optional template body
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+/// Pause/pause-request models
+model PauseReason {
+  id        String   @id @default(cuid())
+  key       String   @unique           // machine key e.g. "technical_issue"
+  label     String                       // human label e.g. "Technical Issue"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PauseRequest {
+  id            String   @id @default(cuid())
+  brfqId        String
+  brfq          BRFQ     @relation(fields: [brfqId], references: [id], onDelete: Cascade)
+  requestedBy   String
+  reasonId      String?
+  reasonText    String?
+  status        String   @default("pending")
+  processedBy   String?
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // history relation — PauseAction must have a field linking back
+  history       PauseAction[]
+}
+
+model PauseAction {
+  id              String   @id @default(cuid())
+
+  brfqId          String
+  brfq            BRFQ     @relation(fields: [brfqId], references: [id], onDelete: Cascade)
+
+  // optional link back to PauseRequest (if this action was created from a PauseRequest)
+  pauseRequestId  String? 
+  pauseRequest    PauseRequest? @relation(fields: [pauseRequestId], references: [id], onDelete: Cascade)
+
+  action          String   // "paused" | "resumed" | "pause_requested" | "pause_rejected"
+  performedBy     String?
+  reasonId        String?
+  reasonText      String?
+  notifySuppliers Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([brfqId])
+  @@index([pauseRequestId])
+}
+
+model AdminPauseConfig {
+  id                     String   @id @default(cuid())
+  approvalRequired       Boolean  @default(false) // if true, buyer pause requests create PauseRequest -> admin must approve
+  notifyInternalEmails   String[] @default([])     // internal recipients
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+/// ----------------------
+/// Award module
+/// ----------------------
+
+model AwardWorkflow {
+  id                 String   @id @default(cuid())
+  name               String   @unique // e.g. "default_award_workflow"
+  description        String?
+  // flexible place to hold rules and notification mapping
+  config             Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  createdBy          String?  // optional user id who created this config
+
+  @@map("award_workflows")
+}
+
+model Award {
+  id               String    @id @default(uuid())
+  brfqId           String    @unique // one award record per BRFQ; remove unique if multiple awards allowed
+  brfq             BRFQ      @relation(fields: [brfqId], references: [id], onDelete: Cascade)
+
+  status           String    @default("pending") // pending | approved | rejected
+  justification    String?
+  estimatedValue   Float?
+  splitAward       Boolean   @default(false)
+  createdBy        String?   // user id
+  createdAt        DateTime  @default(now())
+  approvedBy       String?
+  approvedAt       DateTime?
+  note             String?
+
+  winners          AwardWinner[]
+  approvals        AwardApprovalHistory[]
+
+  @@map("awards")
+}
+
+model AwardWinner {
+  id        String  @id @default(cuid())
+  award     Award   @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  awardId   String
+  supplierId String
+  amount    Float?
+  createdAt DateTime @default(now())
+
+  @@map("award_winners")
+}
+
+model AwardApprovalHistory {
+  id        String   @id @default(cuid())
+  award     Award    @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  awardId   String
+  action    String   // requested | approved | rejected | escalated
+  byUser    String?  // user id or name
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@map("award_approval_history")
 }
 
 
