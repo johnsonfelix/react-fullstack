@@ -1,8 +1,8 @@
-'use client';
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import * as XLSX from 'xlsx';
-import Link from 'next/link';
+"use client";
+import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import * as XLSX from "xlsx";
+import Link from "next/link";
 import {
   AlertCircle,
   Upload,
@@ -15,7 +15,7 @@ import {
   FileText,
   Truck,
   DollarSign,
-} from 'lucide-react';
+} from "lucide-react";
 
 // -----------------------
 // Types
@@ -32,7 +32,6 @@ type Supplier = {
   state?: string;
   zipcode?: string;
   user?: { email?: string | null };
-  // allow other unknown fields (friendly for server responses)
   [key: string]: any;
 };
 type CategoryWithSuppliers = { id: string; name: string; suppliers: Supplier[] };
@@ -43,18 +42,18 @@ type FormItem = {
   itemDescription: string;
   brandManufacturer: string;
   origin: string;
-  estQuantity: number | '';
+  estQuantity: number | "";
   uom: string;
-  currentPrice: number | '';
-  targetPrice: number | '';
-  prValue: number | '';
+  currentPrice: number | "";
+  targetPrice: number | "";
+  prValue: number | "";
 };
 type ValidationErrors = { [key: string]: string };
 
 // -----------------------
-// Small presentational components moved outside RFQForm so they're stable
+// Small presentational components
 // -----------------------
-const InputField = ({ label, name, type = 'text', value, onChange, required = false, error, icon, min, readOnly = false }: any) => (
+const InputField = ({ label, name, type = "text", value, onChange, required = false, error, icon, min, readOnly = false }: any) => (
   <div className="space-y-2">
     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
       {icon}
@@ -64,11 +63,11 @@ const InputField = ({ label, name, type = 'text', value, onChange, required = fa
     <input
       type={type}
       name={name}
-      value={value ?? ''}
+      value={value ?? ""}
       onChange={onChange}
       min={min}
       readOnly={readOnly}
-      className={`w-full px-4 py-2.5 rounded-lg border-2 transition-all ${error ? 'border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'} ${readOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'} outline-none`}
+      className={`w-full px-4 py-2.5 rounded-lg border-2 transition-all ${error ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200" : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"} ${readOnly ? "bg-gray-100 cursor-not-allowed" : "bg-white"} outline-none`}
     />
     {error && (
       <p className="text-sm text-red-600 flex items-center gap-1">
@@ -88,16 +87,17 @@ const SelectField = ({ label, name, value, onChange, options: opts, required = f
     </label>
     <select
       name={name}
-      value={value ?? ''}
+      value={value ?? ""}
       onChange={onChange}
-      className={`w-full px-4 py-2.5 rounded-lg border-2 transition-all ${error ? 'border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200' : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'} bg-white outline-none`}
+      className={`w-full px-4 py-2.5 rounded-lg border-2 transition-all ${error ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200" : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"} bg-white outline-none`}
     >
       <option value="">{placeholder || `Select ${label}`}</option>
-      {Array.isArray(opts) && opts.map((opt: any, idx: number) => (
-        <option key={opt.id || idx} value={opt.value ?? opt.id ?? opt.name}>
-          {opt.label ?? opt.name}
-        </option>
-      ))}
+      {Array.isArray(opts) &&
+        opts.map((opt: any, idx: number) => (
+          <option key={opt.id || idx} value={opt.value ?? opt.id ?? opt.name}>
+            {opt.label ?? opt.name}
+          </option>
+        ))}
     </select>
     {error && (
       <p className="text-sm text-red-600 flex items-center gap-1">
@@ -109,11 +109,11 @@ const SelectField = ({ label, name, value, onChange, options: opts, required = f
 );
 
 // -----------------------
-// RFQForm component
+// RFQForm component (page)
 // -----------------------
 const RFQForm: React.FC = () => {
   // search / category
-  const [categorySearch, setCategorySearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState("");
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
 
   // files & existing attachments (URLs returned from backend)
@@ -131,33 +131,41 @@ const RFQForm: React.FC = () => {
 
   // options (populated from API)
   const [options, setOptions] = useState<any>({
-    currencies: [], customerCategory: [], shippingTypes: [], suppliers: [], address: [], carriers: [], uoms: [], incoterms: [], payment: [],
-    serviceType: [{ id: 'goods', name: 'Goods' }, { id: 'services', name: 'Services' }],
+    currencies: [],
+    customerCategory: [],
+    shippingTypes: [],
+    suppliers: [],
+    address: [],
+    carriers: [],
+    uoms: [],
+    incoterms: [],
+    payment: [],
+    serviceType: [{ id: "goods", name: "Goods" }, { id: "services", name: "Services" }],
   });
 
   // form data
   const [formData, setFormData] = useState<any>({
-    title: '',
-    rfqId: '',
-    openDateTime: '',
-    closeDateType: 'fixed',
-    closeDateTime: '',
+    title: "",
+    rfqId: "",
+    openDateTime: "",
+    closeDateType: "fixed",
+    closeDateTime: "",
     daysAfterOpen: 3,
-    needByDate: '',
-    requesterReference: '',
-    shippingAddress: '',
-    paymentProcess: '',
-    currency: '',
-    shippingType: '',
-    carrier: '',
-    negotiationControls: 'sealed',
-    incoterms: '',
-    noteToSupplier: '',
-    productSpecification: '',
+    needByDate: "",
+    requesterReference: "",
+    shippingAddress: "",
+    paymentProcess: "",
+    currency: "",
+    shippingType: "",
+    carrier: "",
+    negotiationControls: "sealed",
+    incoterms: "",
+    noteToSupplier: "",
+    productSpecification: "",
     categoryIds: [] as string[],
     items: [] as FormItem[],
     suppliersSelected: [] as { id: string; email: string }[],
-    status: 'draft',
+    status: "draft",
   });
 
   const [selectedCategories, setSelectedCategories] = useState<CategoryWithSuppliers[]>([]);
@@ -165,7 +173,7 @@ const RFQForm: React.FC = () => {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [publishOnApproval, setPublishOnApproval] = useState(true);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [manualSupplier, setManualSupplier] = useState({ name: '', email: '', firstName: '', lastName: '' });
+  const [manualSupplier, setManualSupplier] = useState({ name: "", email: "", firstName: "", lastName: "" });
 
   // compute min datetime once on client
   const getMinDateTime = () => new Date().toISOString().slice(0, 16);
@@ -176,31 +184,135 @@ const RFQForm: React.FC = () => {
 
   const [clientMinDateTime, setClientMinDateTime] = useState<string | null>(null);
 
+  // -----------------------
   // fetch options once
+  // -----------------------
   useEffect(() => {
     let mounted = true;
-    axios.get('/api/options/brfq').then((res) => {
-      if (!mounted) return;
-      setOptions((prev: any) => ({ ...prev, ...res.data }));
-    }).catch((err) => {
-      console.error('Error fetching options:', err);
-    });
-    return () => { mounted = false; };
+    axios.get("/api/options/brfq")
+      .then((res) => {
+        if (!mounted) return;
+        setOptions((prev: any) => ({ ...prev, ...res.data }));
+      })
+      .catch((err) => {
+        console.error("Error fetching options:", err);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+  // -----------------------
+  // If user comes from SlideGoods, read sessionStorage -> procurementDraft
+  // only apply when not editing an existing rfq (no ?rfqId=)
+  // -----------------------
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
+      const editId = params.get("rfqId") || params.get("id") || null;
+      // do not override when editing an existing RFQ
+      if (editId) return;
+
+      const raw = sessionStorage.getItem("procurementDraft");
+      if (!raw) return;
+
+      const draft = JSON.parse(raw);
+      if (!draft) return;
+
+      // Map draft items into FormItem shape
+      // draft.items could be: ["line1", "line2"] or [{description: '...'}, {...}] or richer objects
+      const mappedItems: FormItem[] = Array.isArray(draft.items)
+        ? draft.items.map((it: any, idx: number) => {
+            if (typeof it === "string") {
+              return {
+                lineNo: idx + 1,
+                lineType: (options.serviceType && options.serviceType[0]?.name) || "Goods",
+                itemNumber: "",
+                itemDescription: it,
+                brandManufacturer: "",
+                origin: "",
+                estQuantity: 1,
+                uom: "",
+                currentPrice: "",
+                targetPrice: "",
+                prValue: "",
+              };
+            }
+            // object case: try to extract common fields
+            return {
+              lineNo: idx + 1,
+              lineType: it.lineType ?? it.type ?? (options.serviceType && options.serviceType[0]?.name),
+              itemNumber: it.itemNumber ?? it.partNo ?? it.item_number ?? "",
+              itemDescription: it.description ?? it.itemDescription ?? it.item_description ?? it.name ?? "",
+              brandManufacturer: it.brand ?? it.manufacturer ?? it.brandManufacturer ?? "",
+              origin: it.origin ?? "",
+              estQuantity: typeof it.quantity !== "undefined" ? Number(it.quantity) : (it.estQuantity ?? 1),
+              uom: it.uom ?? "",
+              currentPrice: typeof it.currentPrice !== "undefined" ? Number(it.currentPrice) : (it.current_price ?? ""),
+              targetPrice: typeof it.targetPrice !== "undefined" ? Number(it.targetPrice) : (it.target_price ?? ""),
+              prValue: typeof it.prValue !== "undefined" ? Number(it.prValue) : (it.pr_value ?? ""),
+            };
+          })
+        : [];
+
+      // Prepare newFormData but keep existing defaults for fields user might want to supply manually later
+      setFormData((prev: any) => ({
+        ...prev,
+        title: draft.title ?? draft.description ?? prev.title,
+        shippingAddress: draft.address ?? prev.shippingAddress,
+        categoryIds: draft.category ? [String(draft.category)] : prev.categoryIds,
+        items: mappedItems.length ? mappedItems : prev.items,
+      }));
+
+      // If draft contains suppliers, push them into selectedCategories/manual group
+      if (Array.isArray(draft.suppliers) && draft.suppliers.length > 0) {
+        const manualSuppliers = draft.suppliers.map((s: any) => ({
+          id: typeof s === "string" ? s : s.id ?? `manual-${Date.now()}`,
+          name: typeof s === "string" ? s : s.name ?? s.companyName ?? "",
+          firstName: s.firstName ?? null,
+          lastName: s.lastName ?? null,
+          registrationEmail: s.email ?? s.registrationEmail ?? "",
+          email: s.email ?? "",
+          user: { email: s.email ?? "" },
+        }));
+        setSelectedCategories((prev) => {
+          // add or update manual group
+          const idx = prev.findIndex((c) => c.id === "manual");
+          if (idx === -1) {
+            return [...prev, { id: "manual", name: "Selected Suppliers", suppliers: manualSuppliers }];
+          } else {
+            const copy = [...prev];
+            copy[idx] = { ...copy[idx], suppliers: [...copy[idx].suppliers, ...manualSuppliers] };
+            return copy;
+          }
+        });
+        setSelectedSuppliersMap((prev) => ({ ...prev, manual: manualSuppliers.map((s) => s.id) }));
+      }
+
+      // Optionally remove the draft after reading:
+      // sessionStorage.removeItem('procurementDraft');
+    } catch (err) {
+      console.error("Failed to load procurementDraft from sessionStorage", err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
+
+  // -----------------------
   // Auto-generate RFQ id if not present (only when creating new)
+  // -----------------------
   useEffect(() => {
     const generateId = async () => {
       try {
         if (!formData.rfqId) {
-          const res = await fetch('/api/brfq/generate-id');
+          const res = await fetch("/api/brfq/generate-id");
           const data = await res.json();
           if (res.ok && data.rfqId) {
             setFormData((prev: any) => ({ ...prev, rfqId: data.rfqId }));
           }
         }
       } catch (err) {
-        console.error('Could not auto-generate RFQ ID:', err);
+        console.error("Could not auto-generate RFQ ID:", err);
       }
     };
     generateId();
@@ -208,195 +320,177 @@ const RFQForm: React.FC = () => {
   }, []);
 
   // When serviceType options arrive, ensure any item missing lineType gets a sensible default
-useEffect(() => {
-  const defaultType = (options.serviceType && options.serviceType[0]?.name) || 'Goods';
-  setFormData((prev: any) => {
-    if (!prev.items || prev.items.length === 0) return prev;
-    const updated = prev.items.map((it: FormItem) => {
-      if (!it.lineType || it.lineType === '') return { ...it, lineType: defaultType };
-      return it;
+  useEffect(() => {
+    const defaultType = (options.serviceType && options.serviceType[0]?.name) || "Goods";
+    setFormData((prev: any) => {
+      if (!prev.items || prev.items.length === 0) return prev;
+      const updated = prev.items.map((it: FormItem) => {
+        if (!it.lineType || it.lineType === "") return { ...it, lineType: defaultType };
+        return it;
+      });
+      return { ...prev, items: updated };
     });
-    return { ...prev, items: updated };
-  });
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [options.serviceType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.serviceType]);
 
-  // Load draft if ?rfqId= is present in URL
-  // Load draft if ?rfqId= is present in URL
-useEffect(() => {
-  const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const editId = q?.get('rfqId') || q?.get('id') || null;
-  if (!editId) return;
+  // Load draft if ?rfqId= is present in URL (your existing logic) — unchanged
+  useEffect(() => {
+    const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const editId = q?.get("rfqId") || q?.get("id") || null;
+    if (!editId) return;
 
-  (async () => {
-    try {
-      const res = await axios.get(`/api/brfq/${encodeURIComponent(editId)}`);
-      // support both shapes: { success: true, data: {...} } or {...}
-      const payload = res.data?.data ?? res.data ?? null;
-      if (!payload) return;
+    (async () => {
+      try {
+        const res = await axios.get(`/api/brfq/${encodeURIComponent(editId)}`);
+        const payload = res.data?.data ?? res.data ?? null;
+        if (!payload) return;
 
-      // helper to convert server date -> "YYYY-MM-DDTHH:mm" for datetime-local
-      const toDateTimeLocal = (d: any) => {
-        if (!d) return '';
-        const date = new Date(d);
-        if (isNaN(date.getTime())) return '';
-        // slice to minutes (browser expects this for datetime-local)
-        return date.toISOString().slice(0, 16);
-      };
+        const toDateTimeLocal = (d: any) => {
+          if (!d) return "";
+          const date = new Date(d);
+          if (isNaN(date.getTime())) return "";
+          return date.toISOString().slice(0, 16);
+        };
 
-      // Map items safely (don't depend on options.serviceType here)
-      const mappedItems = Array.isArray(payload.items)
-        ? payload.items.map((it: any, idx: number) => ({
-            lineNo: idx + 1,
-            // try to use whatever the backend gives (lineType / serviceType), fallback to 'Goods'
-            lineType: it.lineType ?? it.serviceType ?? 'Goods',
-            itemNumber: it.internalPartNo ?? it.itemNumber ?? '',
-            itemDescription: it.description ?? it.itemDescription ?? '',
-            brandManufacturer: it.manufacturer ?? it.brandManufacturer ?? '',
-            origin: it.origin ?? '',
-            estQuantity: typeof it.quantity !== 'undefined' ? Number(it.quantity) : (it.estQuantity ?? 0),
-            uom: it.uom ?? '',
-            currentPrice: it.currentPrice ?? it.current_price ?? 0,
-            targetPrice: it.targetPrice ?? it.target_price ?? 0,
-            prValue: it.prValue ?? it.pr_value ?? 0,
-          }))
-        : [];
+        const mappedItems = Array.isArray(payload.items)
+          ? payload.items.map((it: any, idx: number) => ({
+              lineNo: idx + 1,
+              lineType: it.lineType ?? it.serviceType ?? "Goods",
+              itemNumber: it.internalPartNo ?? it.itemNumber ?? "",
+              itemDescription: it.description ?? it.itemDescription ?? "",
+              brandManufacturer: it.manufacturer ?? it.brandManufacturer ?? "",
+              origin: it.origin ?? "",
+              estQuantity: typeof it.quantity !== "undefined" ? Number(it.quantity) : it.estQuantity ?? 0,
+              uom: it.uom ?? "",
+              currentPrice: it.currentPrice ?? it.current_price ?? 0,
+              targetPrice: it.targetPrice ?? it.target_price ?? 0,
+              prValue: it.prValue ?? it.pr_value ?? 0,
+            }))
+          : [];
 
-      // suppliersSelected from backend could be: array of ids OR array of objects
-      const suppliersSelectedNormalized = Array.isArray(payload.suppliersSelected)
-        ? payload.suppliersSelected.map((s: any) => (typeof s === 'string' ? { id: s, email: '' } : { id: s.id ?? s, email: s.email ?? '' }))
-        : [];
+        const suppliersSelectedNormalized = Array.isArray(payload.suppliersSelected)
+          ? payload.suppliersSelected.map((s: any) => (typeof s === "string" ? { id: s, email: "" } : { id: s.id ?? s, email: s.email ?? "" }))
+          : [];
 
-      // parse attachmentPath (could be stringified JSON)
-      let attachments: string[] = [];
-      if (Array.isArray(payload.attachmentPath)) attachments = payload.attachmentPath;
-      else if (typeof payload.attachmentPath === 'string' && payload.attachmentPath.trim()) {
-        try {
-          const parsed = JSON.parse(payload.attachmentPath);
-          if (Array.isArray(parsed)) attachments = parsed;
-          else attachments = [payload.attachmentPath];
-        } catch {
-          // not JSON — treat as single URL string
-          attachments = [payload.attachmentPath];
-        }
-      }
-
-      // Build base formData update
-      setFormData((prev: any) => ({
-        ...prev,
-        title: payload.title ?? prev.title,
-        rfqId: payload.rfqId ?? prev.rfqId,
-        openDateTime: toDateTimeLocal(payload.openDateTime ?? payload.open_date ?? payload.open),
-        closeDateTime: toDateTimeLocal(payload.closeDate ?? payload.closeTime ?? payload.close_date ?? payload.close_time ?? payload.close),
-        closeDateType: prev.closeDateType, // keep user's default unless they choose otherwise
-        daysAfterOpen: prev.daysAfterOpen,
-        needByDate: payload.needByDate ? (new Date(payload.needByDate)).toISOString().slice(0,10) : prev.needByDate,
-        requesterReference: payload.requester ?? payload.requesterReference ?? prev.requesterReference,
-        shippingAddress: payload.shippingAddress ?? payload.shipping_address ?? prev.shippingAddress,
-        paymentProcess: payload.paymentProcess ?? prev.paymentProcess ?? prev.paymentProcess,
-        currency: payload.currency ?? prev.currency,
-        shippingType: payload.shippingType ?? prev.shippingType,
-        carrier: payload.carrier ?? prev.carrier,
-        negotiationControls: payload.negotiationControls ?? prev.negotiationControls,
-        incoterms: payload.incoterms ?? prev.incoterms,
-        noteToSupplier: payload.notesToSupplier ?? payload.notesToSupplier ?? payload.noteToSupplier ?? prev.noteToSupplier,
-        productSpecification: payload.productSpecification ?? payload.productSpecification ?? prev.productSpecification,
-        categoryIds: Array.isArray(payload.customerCategory) ? payload.customerCategory : (Array.isArray(payload.categoryIds) ? payload.categoryIds : prev.categoryIds),
-        items: mappedItems.length ? mappedItems : prev.items,
-        status: payload.status ?? prev.status,
-        suppliersSelected: suppliersSelectedNormalized,
-      }));
-
-      // set existing attachments for UI
-      setExistingAttachments(attachments);
-
-      // set selectedCategories + selectedSuppliersMap if customerCategory exists (fetch suppliers for each category)
-      if (Array.isArray(payload.customerCategory) && payload.customerCategory.length > 0) {
-        const cats: CategoryWithSuppliers[] = [];
-        await Promise.all(payload.customerCategory.map(async (catId: string) => {
+        let attachments: string[] = [];
+        if (Array.isArray(payload.attachmentPath)) attachments = payload.attachmentPath;
+        else if (typeof payload.attachmentPath === "string" && payload.attachmentPath.trim()) {
           try {
-            const r = await axios.get(`/api/categories/${encodeURIComponent(catId)}`);
-            const cat = r.data;
-            // try fetch suppliers
-            let suppliers: Supplier[] = [];
-            try {
-              const sres = await axios.get(`/api/categories/${encodeURIComponent(catId)}/suppliers`);
-              suppliers = Array.isArray(sres.data) ? sres.data : [];
-            } catch { suppliers = []; }
-            cats.push({ id: catId, name: cat?.name ?? `Category ${catId}`, suppliers });
+            const parsed = JSON.parse(payload.attachmentPath);
+            if (Array.isArray(parsed)) attachments = parsed;
+            else attachments = [payload.attachmentPath];
           } catch {
-            cats.push({ id: catId, name: catId, suppliers: [] });
+            attachments = [payload.attachmentPath];
           }
-        }));
-        setSelectedCategories(cats);
+        }
 
-        // populate selectedSuppliersMap for categories using payload.supplierMap if provided
-        // fallback: try to mark suppliersSelected under a synthetic category
-        const map: Record<string, string[]> = {};
-        // if backend provided an object mapping, try to use it
-        if (payload.selectedSuppliersMap && typeof payload.selectedSuppliersMap === 'object') {
-          Object.assign(map, payload.selectedSuppliersMap);
+        setFormData((prev: any) => ({
+          ...prev,
+          title: payload.title ?? prev.title,
+          rfqId: payload.rfqId ?? prev.rfqId,
+          openDateTime: toDateTimeLocal(payload.openDateTime ?? payload.open_date ?? payload.open),
+          closeDateTime: toDateTimeLocal(payload.closeDate ?? payload.closeTime ?? payload.close_date ?? payload.close_time ?? payload.close),
+          closeDateType: prev.closeDateType,
+          daysAfterOpen: prev.daysAfterOpen,
+          needByDate: payload.needByDate ? new Date(payload.needByDate).toISOString().slice(0, 10) : prev.needByDate,
+          requesterReference: payload.requester ?? payload.requesterReference ?? prev.requesterReference,
+          shippingAddress: payload.shippingAddress ?? payload.shipping_address ?? prev.shippingAddress,
+          paymentProcess: payload.paymentProcess ?? prev.paymentProcess ?? prev.paymentProcess,
+          currency: payload.currency ?? prev.currency,
+          shippingType: payload.shippingType ?? prev.shippingType,
+          carrier: payload.carrier ?? prev.carrier,
+          negotiationControls: payload.negotiationControls ?? prev.negotiationControls,
+          incoterms: payload.incoterms ?? prev.incoterms,
+          noteToSupplier: payload.notesToSupplier ?? payload.notesToSupplier ?? payload.noteToSupplier ?? prev.noteToSupplier,
+          productSpecification: payload.productSpecification ?? payload.productSpecification ?? prev.productSpecification,
+          categoryIds: Array.isArray(payload.customerCategory) ? payload.customerCategory : Array.isArray(payload.categoryIds) ? payload.categoryIds : prev.categoryIds,
+          items: mappedItems.length ? mappedItems : prev.items,
+          status: payload.status ?? prev.status,
+          suppliersSelected: suppliersSelectedNormalized,
+        }));
+
+        setExistingAttachments(attachments);
+
+        if (Array.isArray(payload.customerCategory) && payload.customerCategory.length > 0) {
+          const cats: CategoryWithSuppliers[] = [];
+          await Promise.all(
+            payload.customerCategory.map(async (catId: string) => {
+              try {
+                const r = await axios.get(`/api/categories/${encodeURIComponent(catId)}`);
+                const cat = r.data;
+                let suppliers: Supplier[] = [];
+                try {
+                  const sres = await axios.get(`/api/categories/${encodeURIComponent(catId)}/suppliers`);
+                  suppliers = Array.isArray(sres.data) ? sres.data : [];
+                } catch {
+                  suppliers = [];
+                }
+                cats.push({ id: catId, name: cat?.name ?? `Category ${catId}`, suppliers });
+              } catch {
+                cats.push({ id: catId, name: catId, suppliers: [] });
+              }
+            })
+          );
+          setSelectedCategories(cats);
+
+          const map: Record<string, string[]> = {};
+          if (payload.selectedSuppliersMap && typeof payload.selectedSuppliersMap === "object") {
+            Object.assign(map, payload.selectedSuppliersMap);
+          } else {
+            if (Array.isArray(payload.suppliersSelected)) {
+              map["all"] = payload.suppliersSelected.map((s: any) => (typeof s === "string" ? s : s.id));
+            }
+          }
+          setSelectedSuppliersMap(map);
         } else {
-          // place all supplier ids under a synthetic 'all' key, UI still shows checkboxes per category when supplier lists are fetched
-          if (Array.isArray(payload.suppliersSelected)) {
-            map['all'] = payload.suppliersSelected.map((s: any) => (typeof s === 'string' ? s : s.id));
+          if (Array.isArray(suppliersSelectedNormalized) && suppliersSelectedNormalized.length > 0) {
+            setSelectedCategories((prev) => {
+              if (!prev.find((c) => c.id === "manual")) {
+                return [...prev, { id: "manual", name: "Selected Suppliers", suppliers: suppliersSelectedNormalized.map((s) => ({ id: s.id, name: s.id, user: { email: s.email || "" } })) }];
+              }
+              return prev;
+            });
+            setSelectedSuppliersMap((prev) => ({ ...prev, manual: suppliersSelectedNormalized.map((s) => s.id) }));
           }
         }
-        setSelectedSuppliersMap(map);
-      } else {
-        // If no categories, but suppliersSelected exist, keep them in formData and create a "Manual Suppliers" group
-        if (Array.isArray(suppliersSelectedNormalized) && suppliersSelectedNormalized.length > 0) {
-          setSelectedCategories((prev) => {
-            // create a manual group if not present
-            if (!prev.find((c) => c.id === 'manual')) {
-              return [...prev, { id: 'manual', name: 'Selected Suppliers', suppliers: suppliersSelectedNormalized.map(s => ({ id: s.id, name: s.id, user: { email: s.email || '' } })) }];
-            }
-            return prev;
-          });
-          setSelectedSuppliersMap((prev) => ({ ...prev, manual: suppliersSelectedNormalized.map(s => s.id) }));
-        }
+      } catch (err) {
+        console.error("Failed to load draft", err);
       }
-    } catch (err) {
-      console.error('Failed to load draft', err);
-    }
-  })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keep suppliersSelected in sync with selectedSuppliersMap + selectedCategories
   useEffect(() => {
-  const selectedSuppliers = selectedCategories
-    .flatMap((cat) =>
-      (selectedSuppliersMap[cat.id] || []).map((sid) => {
-        const supplier = cat.suppliers.find((s) => s.id === sid);
-        if (!supplier) return null;
+    const selectedSuppliers = selectedCategories
+      .flatMap((cat) =>
+        (selectedSuppliersMap[cat.id] || []).map((sid) => {
+          const supplier = cat.suppliers.find((s) => s.id === sid);
+          if (!supplier) return null;
 
-        // choose email from top-level, user.email or registrationEmail
-        const email = supplier.email ?? supplier.user?.email ?? supplier.registrationEmail ?? '';
+          const email = supplier.email ?? supplier.user?.email ?? supplier.registrationEmail ?? "";
 
-        // prefer explicit firstName/lastName; fallback to split name if present
-        const firstName =
-          supplier.firstName ?? supplier.first_name ?? (typeof supplier.name === 'string' ? supplier.name.split(' ')[0] : null) ?? null;
-        const lastName =
-          supplier.lastName ?? supplier.last_name ?? (typeof supplier.name === 'string' ? supplier.name.split(' ').slice(1).join(' ') || null : null) ?? null;
+          const firstName =
+            supplier.firstName ?? supplier.first_name ?? (typeof supplier.name === "string" ? supplier.name.split(" ")[0] : null) ?? null;
+          const lastName =
+            supplier.lastName ?? supplier.last_name ?? (typeof supplier.name === "string" ? supplier.name.split(" ").slice(1).join(" ") || null : null) ?? null;
 
-        const name = supplier.name ?? supplier.companyName ?? supplier.company ?? '';
+          const name = supplier.name ?? supplier.companyName ?? supplier.company ?? "";
 
-        return {
-          id: supplier.id,
-          email,
-          name,
-          firstName,
-          lastName,
-          // include supplier object if you want full detail later (keeps payload flexible)
-          supplier,
-        };
-      })
-    )
-    .filter(Boolean) as any[];
+          return {
+            id: supplier.id,
+            email,
+            name,
+            firstName,
+            lastName,
+            supplier,
+          };
+        })
+      )
+      .filter(Boolean) as any[];
 
-  setFormData((prev: any) => ({ ...prev, suppliersSelected: selectedSuppliers }));
-}, [selectedSuppliersMap, selectedCategories]);
+    setFormData((prev: any) => ({ ...prev, suppliersSelected: selectedSuppliers }));
+  }, [selectedSuppliersMap, selectedCategories]);
 
   // Keep categoryIds sync
   useEffect(() => {
@@ -405,7 +499,7 @@ useEffect(() => {
 
   // Calculate close date when using 'days' option
   useEffect(() => {
-    if (formData.closeDateType === 'days' && formData.openDateTime && Number(formData.daysAfterOpen) > 0) {
+    if (formData.closeDateType === "days" && formData.openDateTime && Number(formData.daysAfterOpen) > 0) {
       const calculateWorkingDays = (startDate: Date, days: number) => {
         let count = 0;
         let currentDate = new Date(startDate);
@@ -428,7 +522,6 @@ useEffect(() => {
   // stable handleChange
   // -----------------------
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>, index?: number) => {
-    // use e.currentTarget to avoid synthetic event pooling issues
     const target = e.currentTarget as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     const name = target.name;
     const type = (target as HTMLInputElement).type;
@@ -437,13 +530,13 @@ useEffect(() => {
 
     let finalValue: any = rawValue;
 
-    if (type === 'number') {
-      finalValue = rawValue === '' ? '' : Number(rawValue);
-    } else if (type === 'checkbox') {
+    if (type === "number") {
+      finalValue = rawValue === "" ? "" : Number(rawValue);
+    } else if (type === "checkbox") {
       finalValue = checked;
     }
 
-    if (typeof index === 'number') {
+    if (typeof index === "number") {
       setFormData((prev: any) => {
         const updatedItems = [...prev.items];
         updatedItems[index] = { ...updatedItems[index], [name]: finalValue } as FormItem;
@@ -453,7 +546,6 @@ useEffect(() => {
       setFormData((prev: any) => ({ ...prev, [name]: finalValue }));
     }
 
-    // clear validation for this field
     setValidationErrors((prev) => {
       if (!prev[name]) return prev;
       const copy = { ...prev };
@@ -474,13 +566,13 @@ useEffect(() => {
           ...prev.items,
           {
             lineNo: newLineNo,
-            lineType: (options.serviceType && options.serviceType[0]?.name) || 'Goods',
-            itemNumber: '',
-            itemDescription: '',
-            brandManufacturer: '',
-            origin: '',
+            lineType: (options.serviceType && options.serviceType[0]?.name) || "Goods",
+            itemNumber: "",
+            itemDescription: "",
+            brandManufacturer: "",
+            origin: "",
             estQuantity: 0,
-            uom: '',
+            uom: "",
             currentPrice: 0,
             targetPrice: 0,
             prValue: 0,
@@ -512,23 +604,23 @@ useEffect(() => {
   const validateForm = () => {
     const errors: ValidationErrors = {};
 
-    if (!formData.title || !String(formData.title).trim()) errors.title = 'RFQ Title is required';
-    if (!formData.openDateTime) errors.openDateTime = 'Open Date & Time is required';
-    if (formData.closeDateType === 'fixed' && !formData.closeDateTime) errors.closeDateTime = 'Close Date & Time is required';
-    if (!formData.shippingAddress) errors.shippingAddress = 'Shipping Address is required';
-    if (!formData.paymentProcess) errors.paymentProcess = 'Payment Process is required';
-    if (!formData.currency) errors.currency = 'Currency is required';
-    if (!formData.shippingType) errors.shippingType = 'Shipping Type is required';
-    if (!formData.incoterms) errors.incoterms = 'Incoterms is required';
-    if (!formData.suppliersSelected || formData.suppliersSelected.length === 0) errors.suppliers = 'At least one supplier must be selected';
-    if (!formData.items || formData.items.length === 0) errors.items = 'At least one item must be added';
+    if (!formData.title || !String(formData.title).trim()) errors.title = "RFQ Title is required";
+    if (!formData.openDateTime) errors.openDateTime = "Open Date & Time is required";
+    if (formData.closeDateType === "fixed" && !formData.closeDateTime) errors.closeDateTime = "Close Date & Time is required";
+    if (!formData.shippingAddress) errors.shippingAddress = "Shipping Address is required";
+    if (!formData.paymentProcess) errors.paymentProcess = "Payment Process is required";
+    if (!formData.currency) errors.currency = "Currency is required";
+    if (!formData.shippingType) errors.shippingType = "Shipping Type is required";
+    if (!formData.incoterms) errors.incoterms = "Incoterms is required";
+    if (!formData.suppliersSelected || formData.suppliersSelected.length === 0) errors.suppliers = "At least one supplier must be selected";
+    if (!formData.items || formData.items.length === 0) errors.items = "At least one item must be added";
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   // -----------------------
-  // Save draft (create or update) — sends existingAttachments to server
+  // Save draft (create or update) — unchanged
   // -----------------------
   const handleSaveDraft = async () => {
     setIsUploading(true);
@@ -537,30 +629,28 @@ useEffect(() => {
     try {
       let rfqId = formData.rfqId;
       if (!rfqId) {
-        const res = await fetch('/api/brfq/generate-id');
+        const res = await fetch("/api/brfq/generate-id");
         const data = await res.json();
         if (res.ok && data.rfqId) {
           rfqId = data.rfqId;
           setFormData((prev: any) => ({ ...prev, rfqId }));
         } else {
-          throw new Error('Failed to generate RFQ ID for draft.');
+          throw new Error("Failed to generate RFQ ID for draft.");
         }
       }
-      const draftData = { ...formData, rfqId, status: 'draft', publishOnApproval };
+      const draftData = { ...formData, rfqId, status: "draft", publishOnApproval };
 
       const payload = new FormData();
-      // append files
       formFiles.forEach((file, idx) => {
         if (!removedFileIndexes.has(idx)) {
-          payload.append('files', file);
+          payload.append("files", file);
         }
       });
-      // send existing attachments (URLs) to keep
-      payload.append('existingAttachments', JSON.stringify(existingAttachments || []));
-      payload.append('rfqData', JSON.stringify(draftData));
+      payload.append("existingAttachments", JSON.stringify(existingAttachments || []));
+      payload.append("rfqData", JSON.stringify(draftData));
 
-      const res = await axios.post('/api/brfq/draft', payload, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const res = await axios.post("/api/brfq/draft", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
@@ -569,31 +659,33 @@ useEffect(() => {
       });
 
       if (res.status === 200 || res.status === 201) {
-        alert('Draft saved successfully!');
-        // update attachments from response (if provided)
+        alert("Draft saved successfully!");
         const created = res.data?.data;
         if (created?.attachmentPath) {
           let attachments = created.attachmentPath;
-          if (typeof attachments === 'string') {
-            try { attachments = JSON.parse(attachments); } catch { /* ignore */ }
+          if (typeof attachments === "string") {
+            try {
+              attachments = JSON.parse(attachments);
+            } catch {
+              //
+            }
           }
           if (Array.isArray(attachments)) setExistingAttachments(attachments);
         }
         if (created?.rfqId) {
           setFormData((prev: any) => ({ ...prev, rfqId: created.rfqId }));
-          // update URL so user can share link to continue editing
-          if (typeof window !== 'undefined') {
+          if (typeof window !== "undefined") {
             const u = new URL(window.location.href);
-            u.searchParams.set('rfqId', created.rfqId);
-            window.history.replaceState({}, '', u.toString());
+            u.searchParams.set("rfqId", created.rfqId);
+            window.history.replaceState({}, "", u.toString());
           }
         }
       } else {
-        throw new Error(res.data?.message || 'Failed to save draft');
+        throw new Error(res.data?.message || "Failed to save draft");
       }
     } catch (error: any) {
-      console.error('Error saving draft:', error);
-      alert(error?.message || 'Failed to save draft');
+      console.error("Error saving draft:", error);
+      alert(error?.message || "Failed to save draft");
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -601,19 +693,19 @@ useEffect(() => {
   };
 
   // -----------------------
-  // Common submit handler (submit or send for approval)
+  // Common submit handler (submit or send for approval) — unchanged
   // -----------------------
-  const commonSubmitHandler = async (status: 'submitted' | 'approval_pending') => {
+  const commonSubmitHandler = async (status: "submitted" | "approval_pending") => {
     setShowErrors(true);
 
     if (!validateForm()) {
-      alert('Please fill in all required fields');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      alert("Please fill in all required fields");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     if (!agreedToTerms) {
-      alert('Please agree to the terms and conditions');
+      alert("Please agree to the terms and conditions");
       return;
     }
 
@@ -624,18 +716,17 @@ useEffect(() => {
       const formDataWithFiles = new FormData();
       formFiles.forEach((file, idx) => {
         if (!removedFileIndexes.has(idx)) {
-          formDataWithFiles.append('files', file);
+          formDataWithFiles.append("files", file);
         }
       });
 
-      // include existing attachments (so backend knows to keep them)
-      formDataWithFiles.append('existingAttachments', JSON.stringify(existingAttachments || []));
+      formDataWithFiles.append("existingAttachments", JSON.stringify(existingAttachments || []));
 
       const finalRfqData = { ...formData, status, publishOnApproval };
-      formDataWithFiles.append('rfqData', JSON.stringify(finalRfqData));
+      formDataWithFiles.append("rfqData", JSON.stringify(finalRfqData));
 
-      const res = await axios.post('/api/brfq', formDataWithFiles, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const res = await axios.post("/api/brfq", formDataWithFiles, {
+        headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
@@ -644,14 +735,13 @@ useEffect(() => {
       });
 
       if (res.status === 200 || res.status === 201) {
-        alert(`RFQ ${status === 'submitted' ? 'submitted' : 'sent for approval'} successfully!`);
-        // redirect or update UI as needed
+        alert(`RFQ ${status === "submitted" ? "submitted" : "sent for approval"} successfully!`);
       } else {
-        throw new Error(res.data?.message || 'Failed to create RFQ');
+        throw new Error(res.data?.message || "Failed to create RFQ");
       }
     } catch (error: any) {
-      console.error('Error submitting RFQ:', error);
-      alert(error?.message || 'Failed to create RFQ');
+      console.error("Error submitting RFQ:", error);
+      alert(error?.message || "Failed to create RFQ");
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -659,30 +749,30 @@ useEffect(() => {
   };
 
   // -----------------------
-  // Excel upload / template
+  // Excel upload / template — unchanged
   // -----------------------
   const handleExcelUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = (evt) => {
       const data = evt.target?.result;
       if (!data) return;
-      const workbook = XLSX.read(data as any, { type: 'binary' });
+      const workbook = XLSX.read(data as any, { type: "binary" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
       const newItems: FormItem[] = jsonData.map((row, index) => ({
         lineNo: formData.items.length + index + 1,
-        lineType: row['Line Type'] || (options.serviceType && options.serviceType[0]?.name) || 'Goods',
-        itemNumber: row['Item Number'] || '',
-        itemDescription: row['Item Description'] || '',
-        brandManufacturer: row['Brand / Manufacturer'] || '',
-        origin: row['Origin'] || '',
-        estQuantity: Number(row['Est. Qty'] || 0),
-        uom: row['UOM'] || '',
-        currentPrice: Number(row['Current Price'] || 0),
-        targetPrice: Number(row['Target / Benchmark Price'] || 0),
-        prValue: Number(row['PR Value'] || 0),
+        lineType: row["Line Type"] || (options.serviceType && options.serviceType[0]?.name) || "Goods",
+        itemNumber: row["Item Number"] || "",
+        itemDescription: row["Item Description"] || "",
+        brandManufacturer: row["Brand / Manufacturer"] || "",
+        origin: row["Origin"] || "",
+        estQuantity: Number(row["Est. Qty"] || 0),
+        uom: row["UOM"] || "",
+        currentPrice: Number(row["Current Price"] || 0),
+        targetPrice: Number(row["Target / Benchmark Price"] || 0),
+        prValue: Number(row["PR Value"] || 0),
       }));
       setFormData((prev: any) => ({ ...prev, items: [...prev.items, ...newItems] }));
     };
@@ -690,74 +780,77 @@ useEffect(() => {
   };
 
   const downloadTemplate = () => {
-    const templateData = [{
-      'Line Type': 'Goods', 'Item Number': '', 'Item Description': '',
-      'Brand / Manufacturer': '', 'Origin': '', 'Est. Qty': 0, 'UOM': 'EA',
-      'Current Price': 0, 'Target / Benchmark Price': 0, 'PR Value': 0
-    }];
+    const templateData = [
+      {
+        "Line Type": "Goods",
+        "Item Number": "",
+        "Item Description": "",
+        "Brand / Manufacturer": "",
+        "Origin": "",
+        "Est. Qty": 0,
+        UOM: "EA",
+        "Current Price": 0,
+        "Target / Benchmark Price": 0,
+        "PR Value": 0,
+      },
+    ];
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, 'RFQ_Items_Template.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "RFQ_Items_Template.xlsx");
   };
 
   // -----------------------
-  // Manual supplier add
+  // Manual supplier add — unchanged
   // -----------------------
- const handleManualSupplierSubmit = () => {
-  if (!manualSupplier.name?.trim()) {
-    alert('Company name is required');
-    return;
-  }
-
-  const id = `manual-${Date.now()}`;
-  const first = manualSupplier.firstName?.trim() || null;
-  const last = manualSupplier.lastName?.trim() || null;
-  const company = manualSupplier.name?.trim() || null;
-  const email = manualSupplier.email?.trim() || null;
-
-  const newSupplier: Supplier = {
-    id,
-    // prefer explicit company name, otherwise use "First Last" if present
-    name: company || (first || last ? `${first ?? ''} ${last ?? ''}`.trim() : `manual-${Date.now()}`),
-    firstName: first,
-    lastName: last,
-    companyName: company,
-    registrationEmail: email,
-    email,
-    user: { email },
-    city: '',
-    state: '',
-    zipcode: '',
-  };
-
-  // Add to (or create) manual group in selectedCategories
-  setSelectedCategories((prev) => {
-    const manualIdx = prev.findIndex((c) => c.id === 'manual');
-    if (manualIdx !== -1) {
-      // avoid duplicates
-      const exists = prev[manualIdx].suppliers.find((s) => s.id === id);
-      if (exists) return prev;
-      const copy = [...prev];
-      copy[manualIdx] = { ...copy[manualIdx], suppliers: [...copy[manualIdx].suppliers, newSupplier] };
-      return copy;
-    } else {
-      return [...prev, { id: 'manual', name: 'Manual Suppliers', suppliers: [newSupplier] }];
+  const handleManualSupplierSubmit = () => {
+    if (!manualSupplier.name?.trim()) {
+      alert("Company name is required");
+      return;
     }
-  });
 
-  // Mark it selected under manual key
-  setSelectedSuppliersMap((prev) => {
-    const current = Array.isArray(prev.manual) ? prev.manual : (prev['manual'] ?? []);
-    const updated = current.includes(id) ? current : [...current, id];
-    return { ...prev, manual: updated };
-  });
+    const id = `manual-${Date.now()}`;
+    const first = manualSupplier.firstName?.trim() || null;
+    const last = manualSupplier.lastName?.trim() || null;
+    const company = manualSupplier.name?.trim() || null;
+    const email = manualSupplier.email?.trim() || null;
 
-  // reset modal inputs + close
-  setManualSupplier({ name: '', email: '', firstName: '', lastName: '' });
-  setShowSupplierModal(false);
-};
+    const newSupplier: Supplier = {
+      id,
+      name: company || (first || last ? `${first ?? ""} ${last ?? ""}`.trim() : `manual-${Date.now()}`),
+      firstName: first,
+      lastName: last,
+      companyName: company,
+      registrationEmail: email,
+      email,
+      user: { email },
+      city: "",
+      state: "",
+      zipcode: "",
+    };
 
+    setSelectedCategories((prev) => {
+      const manualIdx = prev.findIndex((c) => c.id === "manual");
+      if (manualIdx !== -1) {
+        const exists = prev[manualIdx].suppliers.find((s) => s.id === id);
+        if (exists) return prev;
+        const copy = [...prev];
+        copy[manualIdx] = { ...copy[manualIdx], suppliers: [...copy[manualIdx].suppliers, newSupplier] };
+        return copy;
+      } else {
+        return [...prev, { id: "manual", name: "Manual Suppliers", suppliers: [newSupplier] }];
+      }
+    });
+
+    setSelectedSuppliersMap((prev) => {
+      const current = Array.isArray(prev.manual) ? prev.manual : prev["manual"] ?? [];
+      const updated = current.includes(id) ? current : [...current, id];
+      return { ...prev, manual: updated };
+    });
+
+    setManualSupplier({ name: "", email: "", firstName: "", lastName: "" });
+    setShowSupplierModal(false);
+  };
 
   const toggleRemoveFile = (index: number) => {
     setRemovedFileIndexes((prev) => {
@@ -768,20 +861,22 @@ useEffect(() => {
     });
   };
 
-  // Utility to remove an existing attachment URL (user action)
   const removeExistingAttachmentAt = (idx: number) => {
     setExistingAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
   // -----------------------
-  // UI render (kept largely as you had)
+  // UI render (the full form) — unchanged from your original file
   // -----------------------
-  const importInputId = 'excel-import-input';
+  const importInputId = "excel-import-input";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <form
-        onSubmit={(e) => { e.preventDefault(); commonSubmitHandler('submitted'); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          commonSubmitHandler("submitted");
+        }}
         className="max-w-7xl mx-auto px-6 py-8 space-y-6"
       >
         {/* Sticky header / actions */}
@@ -802,7 +897,7 @@ useEffect(() => {
 
               <button type="button" onClick={handleSaveDraft} disabled={isUploading} className="px-5 py-2.5 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50">Save as Draft</button>
 
-              <button type="button" onClick={() => commonSubmitHandler('approval_pending')} disabled={isUploading} className="px-5 py-2.5 rounded-lg font-medium text-white bg-orange-500 hover:bg-orange-600 transition-all shadow-md hover:shadow-lg disabled:opacity-50">Send for Approval</button>
+              <button type="button" onClick={() => commonSubmitHandler("approval_pending")} disabled={isUploading} className="px-5 py-2.5 rounded-lg font-medium text-white bg-orange-500 hover:bg-orange-600 transition-all shadow-md hover:shadow-lg disabled:opacity-50">Send for Approval</button>
 
               <button type="submit" disabled={!agreedToTerms || isUploading} className={`px-6 py-2.5 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg ${agreedToTerms && !isUploading ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>Submit RFQ</button>
             </div>
@@ -869,22 +964,22 @@ useEffect(() => {
               </label>
               <div className="flex items-center gap-4 mb-3">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="closeDateType" value="fixed" checked={formData.closeDateType === 'fixed'} onChange={handleChange} className="w-4 h-4 text-blue-600" />
+                  <input type="radio" name="closeDateType" value="fixed" checked={formData.closeDateType === "fixed"} onChange={handleChange} className="w-4 h-4 text-blue-600" />
                   <span className="text-sm">Fixed Date</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="closeDateType" value="days" checked={formData.closeDateType === 'days'} onChange={handleChange} className="w-4 h-4 text-blue-600" />
+                  <input type="radio" name="closeDateType" value="days" checked={formData.closeDateType === "days"} onChange={handleChange} className="w-4 h-4 text-blue-600" />
                   <span className="text-sm">Days After Open</span>
                 </label>
               </div>
-              {formData.closeDateType === 'fixed' ? (
+              {formData.closeDateType === "fixed" ? (
                 <input
                   type="datetime-local"
                   name="closeDateTime"
                   value={formData.closeDateTime}
                   onChange={handleChange}
                   min={formData.openDateTime || getMinDateTime()}
-                  className={`w-full px-4 py-2.5 rounded-lg border-2 transition-all ${validationErrors.closeDateTime && showErrors ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'} outline-none`}
+                  className={`w-full px-4 py-2.5 rounded-lg border-2 transition-all ${validationErrors.closeDateTime && showErrors ? "border-red-500 bg-red-50" : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"} outline-none`}
                 />
               ) : (
                 <div className="flex items-center gap-2">
@@ -913,13 +1008,13 @@ useEffect(() => {
               type="date"
               value={formData.needByDate}
               onChange={handleChange}
-              min={(formData.closeDateTime ? (formData.closeDateTime as string).split('T')[0] : getMinDateTime().split('T')[0])}
+              min={(formData.closeDateTime ? (formData.closeDateTime as string).split("T")[0] : getMinDateTime().split("T")[0])}
               icon={<Calendar size={16} className="text-gray-500" />}
             />
           </div>
         </div>
 
-        {/* Supplier selection (kept your UI) */}
+        {/* Supplier selection */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Truck className="text-blue-600" size={24} /> Supplier Selection <span className="text-red-500">*</span></h2>
@@ -943,7 +1038,8 @@ useEffect(() => {
                 const val = e.target.value;
                 setCategorySearch(val);
                 if (val.length > 1) {
-                  axios.get(`/api/categories/search?q=${encodeURIComponent(val)}`)
+                  axios
+                    .get(`/api/categories/search?q=${encodeURIComponent(val)}`)
                     .then((res) => setCategoryOptions(res.data || []))
                     .catch((err) => {
                       console.error(err);
@@ -973,7 +1069,7 @@ useEffect(() => {
                             setSelectedCategories((prev) => [...prev, { ...cat, suppliers: [] }]);
                           });
                       }
-                      setCategorySearch('');
+                      setCategorySearch("");
                       setCategoryOptions([]);
                     }}
                     className="px-4 py-3 hover:bg-blue-50 cursor-pointer transition border-b last:border-b-0"
@@ -1018,7 +1114,7 @@ useEffect(() => {
                             return { ...prev, [cat.id]: updated };
                           });
                         }}
-                        className={`p-3 rounded-lg cursor-pointer transition ${selectedSuppliersMap[cat.id]?.includes(s.id) ? 'bg-blue-100 border-2 border-blue-400' : 'bg-gray-50 border-2 border-gray-200 hover:border-blue-300'}`}
+                        className={`p-3 rounded-lg cursor-pointer transition ${selectedSuppliersMap[cat.id]?.includes(s.id) ? "bg-blue-100 border-2 border-blue-400" : "bg-gray-50 border-2 border-gray-200 hover:border-blue-300"}`}
                       >
                         <div className="flex items-center gap-2">
                           <input type="checkbox" checked={selectedSuppliersMap[cat.id]?.includes(s.id) ?? false} readOnly className="w-4 h-4" />
@@ -1109,7 +1205,7 @@ useEffect(() => {
               name="negotiationControls"
               value={formData.negotiationControls}
               onChange={handleChange}
-              options={[{ id: 'sealed', name: 'Sealed', label: 'Sealed', value: 'sealed' }, { id: 'unsealed', name: 'Unsealed', label: 'Unsealed', value: 'unsealed' }]}
+              options={[{ id: "sealed", name: "Sealed", label: "Sealed", value: "sealed" }, { id: "unsealed", name: "Unsealed", label: "Unsealed", value: "unsealed" }]}
               icon={<FileText size={16} className="text-gray-500" />}
             />
 
@@ -1132,7 +1228,7 @@ useEffect(() => {
                 <Download size={16} /> Download Template
               </button>
 
-              <input id={importInputId} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { if (e.target.files && e.target.files[0]) handleExcelUpload(e.target.files[0]); e.currentTarget.value = ''; }} />
+              <input id={importInputId} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { if (e.target.files && e.target.files[0]) handleExcelUpload(e.target.files[0]); e.currentTarget.value = ""; }} />
               <label htmlFor={importInputId} className="flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100 transition border border-yellow-200 cursor-pointer"><Plus size={16} /> Import Excel</label>
 
               <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition border border-blue-200"><Plus size={16} /> Add Item</button>
@@ -1174,14 +1270,14 @@ useEffect(() => {
                     <input type="text" name="itemDescription" value={item.itemDescription} onChange={(e) => handleChange(e as any, index)} placeholder="Description" className="col-span-2 px-2 py-1.5 rounded border border-gray-300 text-sm" />
                     <input type="text" name="brandManufacturer" value={item.brandManufacturer} onChange={(e) => handleChange(e as any, index)} placeholder="Brand" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
                     <input type="text" name="origin" value={item.origin} onChange={(e) => handleChange(e as any, index)} placeholder="Origin" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
-                    <input type="number" name="estQuantity" value={item.estQuantity ?? ''} onChange={(e) => handleChange(e as any, index)} placeholder="Qty" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
+                    <input type="number" name="estQuantity" value={item.estQuantity ?? ""} onChange={(e) => handleChange(e as any, index)} placeholder="Qty" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
                     <select name="uom" value={item.uom} onChange={(e) => handleChange(e as any, index)} className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm">
                       <option value="">UOM</option>
                       {(options.uoms || []).map((u: any, i: number) => <option key={u.id || i} value={u.name}>{u.name}</option>)}
                     </select>
-                    <input type="number" name="currentPrice" value={item.currentPrice ?? ''} onChange={(e) => handleChange(e as any, index)} placeholder="Price" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
-                    <input type="number" name="targetPrice" value={item.targetPrice ?? ''} onChange={(e) => handleChange(e as any, index)} placeholder="Target" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
-                    <input type="number" name="prValue" value={item.prValue ?? ''} onChange={(e) => handleChange(e as any, index)} placeholder="Value" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
+                    <input type="number" name="currentPrice" value={item.currentPrice ?? ""} onChange={(e) => handleChange(e as any, index)} placeholder="Price" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
+                    <input type="number" name="targetPrice" value={item.targetPrice ?? ""} onChange={(e) => handleChange(e as any, index)} placeholder="Target" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
+                    <input type="number" name="prValue" value={item.prValue ?? ""} onChange={(e) => handleChange(e as any, index)} placeholder="Value" className="col-span-1 px-2 py-1.5 rounded border border-gray-300 text-sm" />
                     <div className="col-span-1 flex gap-2">
                       <button type="button" onClick={() => deleteItem(index)} className="px-2 py-1 rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100">Delete</button>
                     </div>
@@ -1227,7 +1323,7 @@ useEffect(() => {
                   <div className="flex items-center gap-3">
                     <FileText size={20} className="text-gray-400" />
                     <div>
-                      <p className="text-sm font-medium">{url.split('/').pop()}</p>
+                      <p className="text-sm font-medium">{url.split("/").pop()}</p>
                       <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">Open</a>
                     </div>
                   </div>
@@ -1241,16 +1337,16 @@ useEffect(() => {
             <div className="mt-4 space-y-2">
               <h3 className="font-semibold text-gray-800">New files (not uploaded)</h3>
               {formFiles.map((f, idx) => (
-                <div key={`${f.name}-${idx}`} className={`flex items-center justify-between p-3 rounded-lg border-2 ${removedFileIndexes.has(idx) ? 'bg-red-50 border-red-200 opacity-50' : 'bg-gray-50 border-gray-200'}`}>
+                <div key={`${f.name}-${idx}`} className={`flex items-center justify-between p-3 rounded-lg border-2 ${removedFileIndexes.has(idx) ? "bg-red-50 border-red-200 opacity-50" : "bg-gray-50 border-gray-200"}`}>
                   <div className="flex items-center gap-3">
                     <FileText size={20} className="text-gray-400" />
                     <div>
-                      <p className={`text-sm font-medium ${removedFileIndexes.has(idx) ? 'line-through' : ''}`}>{f.name}</p>
+                      <p className={`text-sm font-medium ${removedFileIndexes.has(idx) ? "line-through" : ""}`}>{f.name}</p>
                       <p className="text-xs text-gray-500">{Math.round(f.size / 1024)} KB</p>
                     </div>
                   </div>
-                  <button type="button" onClick={() => toggleRemoveFile(idx)} className={`p-2 rounded-lg transition ${removedFileIndexes.has(idx) ? 'text-green-600 hover:bg-green-100' : 'text-red-600 hover:bg-red-100'}`}>
-                    {removedFileIndexes.has(idx) ? 'Undo' : <X size={18} />}
+                  <button type="button" onClick={() => toggleRemoveFile(idx)} className={`p-2 rounded-lg transition ${removedFileIndexes.has(idx) ? "text-green-600 hover:bg-green-100" : "text-red-600 hover:bg-red-100"}`}>
+                    {removedFileIndexes.has(idx) ? "Undo" : <X size={18} />}
                   </button>
                 </div>
               ))}
@@ -1262,7 +1358,7 @@ useEffect(() => {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
           <label className="flex items-start gap-3 cursor-pointer group">
             <input type="checkbox" checked={agreedToTerms} onChange={() => setAgreedToTerms((s) => !s)} className="w-5 h-5 mt-0.5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
-            <span className="text-sm text-gray-700">I agree to the{' '}<Link href="/others/agreement" target="_blank" className="text-blue-600 underline hover:text-blue-800 font-medium">terms and conditions</Link></span>
+            <span className="text-sm text-gray-700">I agree to the{" "}<Link href="/others/agreement" target="_blank" className="text-blue-600 underline hover:text-blue-800 font-medium">terms and conditions</Link></span>
           </label>
         </div>
 

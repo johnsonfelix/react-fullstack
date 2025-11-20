@@ -148,7 +148,7 @@ export default function EventsPage() {
                         href={
                           event.eventType === "RFQ"
                             ? `/buyer/events/edit/${event.id}?rfqId=${encodeURIComponent(event.id)}`
-                            : `/buyer/rfp/${event.id}/edit?id=${encodeURIComponent(event.id)}`
+                            : `/buyer/rfp/${event.id}`
                         }
                         className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded"
                       >
