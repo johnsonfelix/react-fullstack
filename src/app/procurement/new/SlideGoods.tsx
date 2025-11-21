@@ -1,213 +1,126 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-
-type DraftItem = {
-  lineNo: number;
-  lineType: string;
-  itemNumber: string;
-  itemDescription: string;
-  brandManufacturer: string;
-  uom: string;
-  _raw?: any;
-};
+import { useState } from "react";
 
 export default function SlideGoods({
   procurementDraft,
   setProcurementDraft,
+  next,
   prev,
 }: any) {
-  const router = useRouter();
-  const TYPE_DEFAULT = "Goods";
+  const [title, setTitle] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [manufacturerPartNumber, setManufacturerPartNumber] = useState("");
+  const [uom, setUom] = useState("");
+  const [price, setPrice] = useState(0);
 
-  const normalizeDraftItems = (items: any[]): DraftItem[] => {
-    if (!Array.isArray(items)) return [];
-
-    return items.map((it: any, idx: number) => {
-      if (typeof it === "string") {
-        return {
-          lineNo: idx + 1,
-          lineType: TYPE_DEFAULT,
-          itemNumber: "",
-          itemDescription: it,
-          brandManufacturer: "",
-          uom: "",
-        };
-      }
-
-      return {
-        lineNo: idx + 1,
-        lineType: it.lineType ?? TYPE_DEFAULT,
-        itemNumber: it.itemNumber ?? "",
-        itemDescription: it.itemDescription ?? it.description ?? "",
-        brandManufacturer: it.brandManufacturer ?? it.brand ?? "",
-        uom: it.uom ?? "",
-        _raw: it,
-      };
+  const addItem = () => {
+    if (!title.trim()) return alert("Please enter item title.");
+    setProcurementDraft({
+      ...procurementDraft,
+      items: [
+        ...procurementDraft.items,
+        { title, quantity, manufacturerPartNumber, uom, price },
+      ],
     });
-  };
-
-  const [rows, setRows] = useState<DraftItem[]>(() =>
-    normalizeDraftItems(procurementDraft.items || [])
-  );
-
-  const renumber = (list: DraftItem[]) =>
-    list.map((r, i) => ({ ...r, lineNo: i + 1 }));
-
-  const addRow = () => {
-    setRows((prev) =>
-      renumber([
-        ...prev,
-        {
-          lineNo: prev.length + 1,
-          lineType: TYPE_DEFAULT,
-          itemNumber: "",
-          itemDescription: "",
-          brandManufacturer: "",
-          uom: "",
-        },
-      ])
-    );
-  };
-
-  const updateRow = (index: number, patch: Partial<DraftItem>) => {
-    setRows((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], ...patch };
-      return copy;
-    });
-  };
-
-  const deleteRow = (index: number) => {
-    setRows((prev) => {
-      const copy = [...prev];
-      copy.splice(index, 1);
-      return renumber(copy);
-    });
-  };
-
-  const handleFinish = () => {
-    const finalItems = rows.map((r) => ({
-      lineNo: r.lineNo,
-      lineType: r.lineType,
-      itemNumber: r.itemNumber,
-      itemDescription: r.itemDescription,
-      brandManufacturer: r.brandManufacturer,
-      uom: r.uom,
-      _raw: r._raw ?? null,
-    }));
-
-    const finalDraft = { ...procurementDraft, items: finalItems };
-
-    sessionStorage.setItem("procurementDraft", JSON.stringify(finalDraft));
-
-    if (typeof setProcurementDraft === "function")
-      setProcurementDraft(finalDraft);
-
-    router.push("/buyer/events/create");
+    setTitle("");
+    setQuantity(1);
+    setManufacturerPartNumber("");
+    setUom("");
+    setPrice(0);
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold">📦 Goods / Items Details</h2>
-      <p className="text-sm text-gray-600">
-        Add the items you want to procure. You can edit them later in the event
-        creation page.
-      </p>
+      <h2 className="text-2xl font-semibold">📦 Add Goods</h2>
+      <p className="text-gray-600">Add the goods you want to procure below.</p>
 
-      <div className="bg-white border p-4 rounded-lg space-y-3">
-        {/* Header */}
-        <div className="grid grid-cols-7 gap-3 font-semibold text-sm text-gray-600 border-b pb-2">
-          <div>Line No</div>
-          <div>Type</div>
-          <div>Item #</div>
-          <div className="col-span-2">Description</div>
-          <div>Brand</div>
-          <div>UOM</div>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Item Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g., Steel Bolts"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+          />
         </div>
 
-        {/* Rows */}
-        {rows.map((row, index) => (
-          <div
-            key={row.lineNo}
-            className="grid grid-cols-7 gap-3 items-center py-2 border-b"
-          >
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer Part Number</label>
+          <input
+            value={manufacturerPartNumber}
+            onChange={(e) => setManufacturerPartNumber(e.target.value)}
+            placeholder="Optional"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
             <input
-              readOnly
-              value={row.lineNo}
-              className="px-2 py-1 border rounded bg-gray-100 text-sm"
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              placeholder="e.g., 100"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
             />
-
-            <select
-              value={row.lineType}
-              onChange={(e) => updateRow(index, { lineType: e.target.value })}
-              className="px-2 py-1 border rounded text-sm"
-            >
-              <option value="Goods">Goods</option>
-              <option value="Services">Services</option>
-            </select>
-
-            <input
-              value={row.itemNumber}
-              onChange={(e) => updateRow(index, { itemNumber: e.target.value })}
-              placeholder="Item #"
-              className="px-2 py-1 border rounded text-sm"
-            />
-
-            <input
-              value={row.itemDescription}
-              onChange={(e) =>
-                updateRow(index, { itemDescription: e.target.value })
-              }
-              placeholder="Description"
-              className="px-2 py-1 border rounded text-sm col-span-2"
-            />
-
-            <input
-              value={row.brandManufacturer}
-              onChange={(e) =>
-                updateRow(index, { brandManufacturer: e.target.value })
-              }
-              placeholder="Brand"
-              className="px-2 py-1 border rounded text-sm"
-            />
-
-            <input
-              value={row.uom}
-              onChange={(e) => updateRow(index, { uom: e.target.value })}
-              placeholder="UOM"
-              className="px-2 py-1 border rounded text-sm"
-            />
-
-            <button
-              onClick={() => deleteRow(index)}
-              className="text-red-600 text-xs underline ml-2 col-span-7 text-right"
-            >
-              Remove
-            </button>
           </div>
-        ))}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unit of Measure (UOM)</label>
+            <input
+              value={uom}
+              onChange={(e) => setUom(e.target.value)}
+              placeholder="e.g., Kg, Pieces"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(Number(e.target.value))}
+              placeholder="e.g., 250"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
 
-        {/* Add Item Button */}
         <button
-          onClick={addRow}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+          onClick={addItem}
+          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
         >
-          + Add Item
+          ➕ Add Item
         </button>
       </div>
 
-      <div className="flex justify-between">
-        <button onClick={prev} className="py-2 px-4 border rounded">
-          Back
-        </button>
+      {procurementDraft.items.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-2">Items Added:</h3>
+          <ul className="list-disc pl-6 space-y-1 text-gray-800">
+            {procurementDraft.items.map((item: any, idx: number) => (
+              <li key={idx}>
+                {item.title} — Qty: {item.quantity}, Part#: {item.manufacturerPartNumber || "N/A"}, UOM: {item.uom || "N/A"}, Price: ${item.price}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
+      <div className="flex justify-between pt-6">
         <button
-          onClick={handleFinish}
-          className="py-2 px-6 bg-green-600 text-white rounded"
+          onClick={prev}
+          className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
         >
-          Create procurement event
+          ⬅ Back
+        </button>
+        <button
+          onClick={next}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          Next ➜
         </button>
       </div>
     </div>

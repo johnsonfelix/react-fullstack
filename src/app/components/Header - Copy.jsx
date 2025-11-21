@@ -1,0 +1,104 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Plus, List, ChartArea, Settings, Users } from "lucide-react";
+import Link from "next/link";
+import UserAccountnav from "./userAccountnav";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+
+export default function Header() {
+  const [showPopup, setShowPopup] = useState(false);
+
+  // Prevent hydration mismatch by rendering client-only UI after mount
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const session = useSession();
+  const router = useRouter();
+
+  return (
+    <>
+      <header className="backdrop-blur-md bg-white/30 shadow-lg fixed top-0 w-full z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            
+            {/* Logo */}
+            <div className="flex-shrink-0 text-xl font-bold text-indigo-600">
+              Logo
+            </div>
+
+            {/* Middle Section */}
+            <div className="flex items-center space-x-6">
+              
+              {/* Intake Button */}
+              <button
+                onClick={() => router.push("/procurement/new")}
+                className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full shadow transition"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Intake
+              </button>
+              
+
+              {/* Navigation Links */}
+              <nav className="hidden md:flex space-x-6 items-center">
+                <Link
+                  href="/events"
+                  className="flex items-center text-gray-700 hover:text-indigo-600 transition font-medium"
+                >
+                  <List className="w-5 h-5 mr-1" /> Events
+                </Link>
+
+                <Link
+                  href="#services"
+                  className="flex items-center text-gray-700 hover:text-indigo-600 transition font-medium"
+                >
+                  <ChartArea className="w-5 h-5 mr-1" /> Analytics
+                </Link>
+
+                <Link
+                  href="/administration/address"
+                  className="flex items-center text-gray-700 hover:text-indigo-600 transition font-medium"
+                >
+                  <Settings className="w-5 h-5 mr-1" /> Administration
+                </Link>
+
+                {/* ➕ Supplier Invite Button */}
+              <button
+                onClick={() => router.push("/administration/supplier-invite")}
+                className="flex items-center border border-indigo-600 text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-full shadow transition"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Supplier Invite
+              </button>
+              
+              </nav>
+            </div>
+
+            {/* Right Section: Account or Sign In */}
+            <div>
+              {mounted ? (
+                session.status === "authenticated" ? (
+                  <UserAccountnav />
+                ) : (
+                  <Link
+                    href="/sign-in"
+                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 transition shadow"
+                  >
+                    Sign In
+                  </Link>
+                )
+              ) : (
+                <div className="w-[104px] h-10 rounded-md bg-gray-100/50" aria-hidden />
+              )}
+            </div>
+
+          </div>
+        </div>
+      </header>
+    </>
+  );
+}
