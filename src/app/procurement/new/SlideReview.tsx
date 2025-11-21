@@ -90,7 +90,7 @@ export default function SlideReview({ procurementDraft, prev }: any) {
       {/* AI Questions */}
       {procurementDraft.aiQuestions && procurementDraft.aiQuestions.length > 0 && (
         <div className="bg-white rounded-lg p-4 border shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">🤖 AI Clarifications</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">🤖 AI Guided intake</h3>
           <ul className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
             {procurementDraft.aiQuestions.map((q: any, idx: number) => (
               <li key={q.id} className="bg-gray-50 rounded p-3">
