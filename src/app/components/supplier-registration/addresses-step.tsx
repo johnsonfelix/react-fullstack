@@ -66,7 +66,7 @@ export default function AddressesStep() {
                   <Label htmlFor={`usage-po-${index}`} className="font-normal">Receive Purchase Orders</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                   <Controller
+                  <Controller
                     control={control}
                     name={`addresses.${index}.usage.receivePayments`}
                     render={({ field }) => (
@@ -76,7 +76,7 @@ export default function AddressesStep() {
                   <Label htmlFor={`usage-rp-${index}`} className="font-normal">Receive Payments</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                   <Controller
+                  <Controller
                     control={control}
                     name={`addresses.${index}.usage.bidOnRFQs`}
                     render={({ field }) => (
@@ -90,48 +90,49 @@ export default function AddressesStep() {
           </div>
 
           <div className="space-y-4">
-             <div className="grid grid-cols-3 gap-4">
-                 <Input placeholder="Address Line 1" {...register(`addresses.${index}.line1`)} />
-                 <Input placeholder="Address Line 2" {...register(`addresses.${index}.line2`)} />
-                 <Input placeholder="Address Line 3" {...register(`addresses.${index}.line3`)} />
-             </div>
-             <div className="grid grid-cols-3 gap-4">
-                <Input placeholder="City or Town" {...register(`addresses.${index}.city`)} />
-                <Input placeholder="Pin Code" {...register(`addresses.${index}.postalCode`)} />
-                <Input placeholder="State" {...register(`addresses.${index}.state`)} />
-             </div>
+            <div className="grid grid-cols-3 gap-4">
+              <Input placeholder="Address Line 1" {...register(`addresses.${index}.line1`)} />
+              <Input placeholder="Address Line 2" {...register(`addresses.${index}.line2`)} />
+              <Input placeholder="Address Line 3" {...register(`addresses.${index}.line3`)} />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <Input placeholder="City or Town" {...register(`addresses.${index}.city`)} />
+              <Input placeholder="Pin Code" {...register(`addresses.${index}.postalCode`)} />
+              <Input placeholder="State" {...register(`addresses.${index}.state`)} />
+            </div>
           </div>
-          
+
           <fieldset className="pt-4 border-t">
-              <legend className="text-md font-semibold mb-3">Which contacts are associated to this address?</legend>
-              <div className="space-y-3">
-                  {contacts.map((contact: any, contactIndex: number) => (
-                      <div key={contactIndex} className="flex items-center space-x-3">
-                           <Controller
-                                control={control}
-                                name={`addresses.${index}.associatedContacts`}
-                                render={({ field }) => {
-                                    const current = Array.isArray(field.value) ? field.value : [];
-                                    const checked = contact && contact.id ? current.includes(contact.id) : false;
-                                    return (
-                                        <Checkbox 
-                                            onCheckedChange={(checked) => {
-                                                const newValues = checked 
-                                                    ? [...current, contact.id] 
-                                                    : current.filter((id: string) => id !== contact.id);
-                                                field.onChange(newValues);
-                                            }}
-                                            checked={checked}
-                                        />
-                                    );
-                                }}
-                            />
-                          <Label className="font-normal flex-1">
-                              {contact.firstName} {contact.lastName} ({contact.email})
-                          </Label>
-                      </div>
-                  ))}
-              </div>
+            <legend className="text-md font-semibold mb-3">Which contacts are associated to this address?</legend>
+            <div className="space-y-3">
+              {contacts.map((contact: any, contactIndex: number) => (
+                <div key={contactIndex} className="flex items-center space-x-3">
+                  <Controller
+                    control={control}
+                    name={`addresses.${index}.associatedContacts`}
+                    render={({ field }) => {
+                      const current = Array.isArray(field.value) ? field.value : [];
+                      const identifier = contact.id || contact.email;
+                      const checked = current.includes(identifier);
+                      return (
+                        <Checkbox
+                          onCheckedChange={(checked) => {
+                            const newValues = checked
+                              ? [...current, identifier]
+                              : current.filter((val: string) => val !== identifier);
+                            field.onChange(newValues);
+                          }}
+                          checked={checked}
+                        />
+                      );
+                    }}
+                  />
+                  <Label className="font-normal flex-1">
+                    {contact.firstName} {contact.lastName} ({contact.email})
+                  </Label>
+                </div>
+              ))}
+            </div>
           </fieldset>
 
         </div>
@@ -142,13 +143,13 @@ export default function AddressesStep() {
         variant="outline"
         onClick={() =>
           append({
-  addressType: "",
-  usage: { receivePurchaseOrders: false, receivePayments: false, bidOnRFQs: false },
-  addressLine1: "", addressLine2: "", addressLine3: "",
-  city: "", postalCode: "", state: "",
-  country: "IN",
-  associatedContacts: []
-})
+            type: "",
+            usage: { receivePurchaseOrders: false, receivePayments: false, bidOnRFQs: false },
+            line1: "", line2: "", line3: "",
+            city: "", postalCode: "", state: "",
+            country: "IN",
+            associatedContacts: []
+          })
         }
       >
         Add Another Address

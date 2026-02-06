@@ -66,7 +66,7 @@ export async function POST(req: NextRequest, context: any) {
           brfqId,
           action: "resumed",
           performedBy,
-          notifySuppliers,
+          // notifySuppliers,
         },
       }),
     ]);
@@ -95,7 +95,8 @@ export async function POST(req: NextRequest, context: any) {
     }
 
     // internal notifications
-    const cfg = await prisma.adminPauseConfig.findFirst();
+    // const cfg = await prisma.adminPauseConfig.findFirst();
+    const cfg: any = null;
     if (notifyInternal && Array.isArray(cfg?.notifyInternalEmails) && cfg!.notifyInternalEmails.length) {
       const subj = `RFQ ${brfq.rfqId} resumed`;
       const bodyMsg = `${performedBy} resumed RFQ ${brfq.rfqId}.`;

@@ -109,17 +109,17 @@ export const supplierRegistrationSchema = z.object({
   verifiedEmail: z.string().email({ message: "A valid verified email is required." }),
 
   companyDetails: z.object({
-  companyName: z.string().min(1, { message: "Company name is required." }),
-  website: z.union([z.string().url({ message: "Please enter a valid URL." }), z.literal("")]).optional(),
-  country: z.string().min(1, { message: "Country is required." }), // keep required if you want
-  organizationType: z.string().min(1, { message: "Organization type is required." }),
-  supplierType: z.string().optional(),
-  tradeLicenseNumber: z.string().optional(),
-  taxRegistrationNumber: z.string().optional(),
-  noteToApprover: z.string().optional(),
-  businessDocuments: z.array(businessDocumentSchema).optional(),
-  profileAttachments: z.array(z.string()).optional().default([]),
-}),
+    companyName: z.string().min(1, { message: "Company name is required." }),
+    website: z.union([z.string().url({ message: "Please enter a valid URL." }), z.literal("")]).optional(),
+    country: z.string().min(1, { message: "Country is required." }), // keep required if you want
+    organizationType: z.string().min(1, { message: "Organization type is required." }),
+    supplierType: z.string().optional(),
+    tradeLicenseNumber: z.string().optional(),
+    taxRegistrationNumber: z.string().optional(),
+    noteToApprover: z.string().optional(),
+    businessDocuments: z.array(businessDocumentSchema).optional(),
+    profileAttachments: z.array(z.string()).optional().default([]),
+  }),
 
   contacts: z.array(contactSchema).min(1, { message: "At least one contact is required." }),
 
@@ -132,12 +132,11 @@ export const supplierRegistrationSchema = z.object({
   productsAndServices: z.array(z.string()).optional(),
 
   questionnaire: z.object({
-  question1: booleanFromString.default(false),
-  question2: z.enum(["yes", "no", "na"], { required_error: "Please select an option." }),
-  completedSections: z.array(z.string()).optional(),
-})
-.catchall(z.any())    // <-- allow arbitrary questionId keys and any values
-.optional()
+    completedSections: z.array(z.string()).optional(),
+    __allComplete: z.boolean().optional(),
+  })
+    .catchall(z.any())
+    .optional()
 });
 
 // Type export for use in components

@@ -15,7 +15,7 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import Link from 'next/link';
 import GoogleSignInButton from '../GoogleSignInButton';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 import { redirect } from 'next/dist/server/api-utils';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -40,19 +40,27 @@ const SignInForm = () => {
   });
 
   const onSubmit = async (values: z.infer<typeof FormSchema>) => {
-    const signInData = await signIn('credentials',{
+    const signInData = await signIn('credentials', {
       email: values.email,
       password: values.password,
       redirect: false,
     });
-    if(signInData?.error){
+    if (signInData?.error) {
       toast('Oops! something went wrong');
     } else {
       localStorage.setItem('email', values.email);
-      router.push('/events')
+      // Check role to redirect appropriately
+      const session = await getSession();
+      if (session?.user?.type === "APPROVER") {
+        router.push('/approver-dashboard');
+      } else if (session?.user?.type === "SUPPLIER") {
+        router.push('/supplier/dashboard');
+      } else {
+        router.push('/events');
+      }
       router.refresh();
-    } 
-    
+    }
+
   };
 
   return (
@@ -95,6 +103,14 @@ const SignInForm = () => {
                 </FormItem>
               )}
             />
+            <div className="flex justify-end">
+              <Link
+                href="/recover"
+                className="text-sm text-blue-600 hover:text-blue-500 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </div>
           <Button
             className="w-full mt-6 p-3 bg-blue-600 text-white rounded-md hover:bg-blue-700"

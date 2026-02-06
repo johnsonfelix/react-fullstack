@@ -7,82 +7,22 @@ export async function POST(req: Request) {
 
   try {
     await prisma.question.deleteMany({
-      where: { deliverableId },
+      // where: { deliverableId },
+      where: { procurementRequestId: rfpId },
     });
 
     await prisma.$transaction(async (tx) => {
       for (const q of questions) {
-        const createdParent = await tx.question.create({
+        await tx.question.create({
           data: {
-            text: q.serviceName ?? q.text, // ✅ use serviceName as text
+            text: q.serviceName ?? q.text,
             type: q.type,
             required: q.required,
-            quantity: q.quantity ?? null,
-            uom: q.uom ?? null,
-            benchmark: q.benchmark ?? null,
-            deliverableId,
-            rfpId,
-            conditionOperator: q.conditionOperator ?? null,
-            conditionValue: q.conditionValue ?? null,
-            serviceName: q.serviceName ?? null,
-            serviceType: q.serviceType ?? null, // ✅ new
+            procurementRequestId: rfpId,
+            order: 0, // Default order
           },
         });
-
-        // Components under Service
-        if (q.components && Array.isArray(q.components)) {
-          for (const c of q.components) {
-            const createdComponent = await tx.question.create({
-              data: {
-                text: c.description || c.label || "Component",
-                type: c.uom?.toLowerCase() === "yes/no" ? "yes_no" : "text",
-                required: c.required,
-                quantity: c.quantity ? parseInt(c.quantity) : null,
-                uom: c.uom ?? null,
-                benchmark: c.benchmark ?? null,
-                deliverableId,
-                rfpId,
-                parentQuestionId: createdParent.id,
-                conditionOperator: c.conditional?.operator ?? null,
-                conditionValue: c.conditional?.conditionValue ?? null,
-              },
-            });
-
-            if (c.conditional && c.conditional.subComponent) {
-              const sub = c.conditional.subComponent;
-              await tx.question.create({
-                data: {
-                  text: sub.description,
-                  type: "text",
-                  required: sub.required,
-                  quantity: sub.quantity ? parseInt(sub.quantity) : null,
-                  uom: sub.uom ?? null,
-                  benchmark: sub.benchmark ?? null,
-                  deliverableId,
-                  rfpId,
-                  parentQuestionId: createdComponent.id,
-                },
-              });
-            }
-          }
-        }
-
-        if (q.subQuestion) {
-          const sub = q.subQuestion;
-          await tx.question.create({
-            data: {
-              text: sub.text,
-              type: sub.type,
-              required: sub.required,
-              quantity: sub.quantity ?? null,
-              uom: sub.uom ?? null,
-              benchmark: sub.benchmark ?? null,
-              deliverableId,
-              rfpId,
-              parentQuestionId: createdParent.id,
-            },
-          });
-        }
+        // Removed unsupported nested questions and components logic
       }
     });
 
@@ -98,22 +38,15 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const deliverableId = searchParams.get("deliverableId");
+  const rfpId = searchParams.get("rfpId") || searchParams.get("procurementRequestId");
 
-  if (!deliverableId) {
-    return NextResponse.json({ error: "Missing deliverableId" }, { status: 400 });
+  if (!rfpId) {
+    return NextResponse.json({ error: "Missing rfpId" }, { status: 400 });
   }
 
   const questions = await prisma.question.findMany({
-    where: { deliverableId, parentQuestionId: null },
-    include: {
-      subQuestions: {
-        include: {
-          subQuestions: true,
-        },
-      },
-    },
-    orderBy: { createdAt: "asc" },
+    where: { procurementRequestId: rfpId },
+    orderBy: { order: "asc" },
   });
 
   return NextResponse.json(questions);

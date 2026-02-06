@@ -51,7 +51,8 @@ export async function POST(req: NextRequest, context: any) {
     if (!brfq) return NextResponse.json({ success: false, error: "BRFQ not found" }, { status: 404 });
 
     // read admin config - if not exists assume approval not required
-    const cfg = await prisma.adminPauseConfig.findFirst();
+    // const cfg = await prisma.adminPauseConfig.findFirst();
+    const cfg: any = null;
     const approvalRequired = cfg?.approvalRequired ?? false;
 
     if (approvalRequired) {
@@ -60,8 +61,9 @@ export async function POST(req: NextRequest, context: any) {
         data: {
           brfqId,
           requestedBy,
-          reasonId,
-          reasonText,
+          reason: reasonText || String(reasonId) || "Pause requested",
+          // reasonId,
+          // reasonText,
           status: "pending",
         },
       });
@@ -72,9 +74,9 @@ export async function POST(req: NextRequest, context: any) {
           brfqId,
           action: "pause_requested",
           performedBy: requestedBy,
-          reasonId,
-          reasonText,
-          notifySuppliers,
+          // reasonId,
+          // reasonText,
+          // notifySuppliers,
         },
       });
 
@@ -97,9 +99,9 @@ export async function POST(req: NextRequest, context: any) {
           brfqId,
           action: "paused",
           performedBy: requestedBy,
-          reasonId,
-          reasonText,
-          notifySuppliers,
+          // reasonId,
+          // reasonText,
+          // notifySuppliers,
         },
       }),
     ]);

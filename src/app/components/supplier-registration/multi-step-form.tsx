@@ -96,7 +96,7 @@ export default function MultiStepForm({ verifiedEmail }: MultiStepFormProps) {
     businessDocuments: [],
     bankAccounts: [],
     productsAndServices: [],
-    questionnaire: { question1: false, question2: "na" } as any,
+    questionnaire: {} as any,
   } as FormValues;
 
   const methods = useForm<SupplierRegistrationFormValues>({
@@ -124,7 +124,7 @@ export default function MultiStepForm({ verifiedEmail }: MultiStepFormProps) {
     ["businessDocuments"],
     ["bankAccounts"],
     ["productsAndServices"],
-    ["questionnaire.question1", "questionnaire.question2"],
+    ["questionnaire"],
   ];
 
   const getDirtyValues = (dirtyObj: any, allValues: FormValues) => {
@@ -247,120 +247,120 @@ export default function MultiStepForm({ verifiedEmail }: MultiStepFormProps) {
   };
 
   // SAVE PROGRESS
-const handleSaveProgress = async () => {
-  const allValues = getValues();
-  const dirtyData = getDirtyValues(dirtyFields as any, allValues);
+  const handleSaveProgress = async () => {
+    const allValues = getValues();
+    const dirtyData = getDirtyValues(dirtyFields as any, allValues);
 
-  // define which top-level keys are allowed to be saved for each step index
-  const allowedByStep: string[][] = [
-    ["companyDetails"], // step 0 -> only company details
-    ["companyDetails", "contacts"], // step 1 -> company + contacts
-    ["companyDetails", "contacts", "addresses"], // step 2
-    ["companyDetails", "contacts", "addresses", "businessDocuments"], // step 3
-    ["companyDetails", "contacts", "addresses", "businessDocuments", "bankAccounts"], // step 4
-    ["companyDetails", "contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"], // step 5
-    ["companyDetails", "contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices", "questionnaire"], // step 6
-  ];
+    // define which top-level keys are allowed to be saved for each step index
+    const allowedByStep: string[][] = [
+      ["companyDetails"], // step 0 -> only company details
+      ["companyDetails", "contacts"], // step 1 -> company + contacts
+      ["companyDetails", "contacts", "addresses"], // step 2
+      ["companyDetails", "contacts", "addresses", "businessDocuments"], // step 3
+      ["companyDetails", "contacts", "addresses", "businessDocuments", "bankAccounts"], // step 4
+      ["companyDetails", "contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"], // step 5
+      ["companyDetails", "contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices", "questionnaire"], // step 6
+    ];
 
-  const allowed = allowedByStep[currentStep] ?? allowedByStep[allowedByStep.length - 1];
+    const allowed = allowedByStep[currentStep] ?? allowedByStep[allowedByStep.length - 1];
 
-  const pickAllowed = (src: Record<string, any>) => {
-    const out: Record<string, any> = {};
-    for (const k of Object.keys(src)) {
-      if (allowed.includes(k)) out[k] = src[k];
-    }
-    return out;
-  };
-
-  let payloadBody: Record<string, any> = {};
-  if (Object.keys(dirtyData).length > 0) {
-    payloadBody = pickAllowed(dirtyData);
-
-    const arrayFields = ["contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"];
-    for (const arrField of arrayFields) {
-      // If allowed and not present in payload, add the full array
-      if (allowed.includes(arrField) && !(arrField in payloadBody) && Array.isArray(allValues[arrField]) && allValues[arrField].length > 0) {
-        payloadBody[arrField] = allValues[arrField];
+    const pickAllowed = (src: Record<string, any>) => {
+      const out: Record<string, any> = {};
+      for (const k of Object.keys(src)) {
+        if (allowed.includes(k)) out[k] = src[k];
       }
-    }
+      return out;
+    };
 
-    // ---- NEW: For any arrays we are PATCHING (i.e. present in payloadBody),
-    // merge partial items with the full item from allValues by index (if available)
-    // so server doesn't receive tiny partial objects that replace the whole array.
-    const arrayFieldsToNormalize = ["contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"];
-    for (const arrField of arrayFieldsToNormalize) {
-      if (!Array.isArray(payloadBody[arrField])) continue;
-      const originalArray = Array.isArray(allValues[arrField]) ? allValues[arrField] : [];
-      payloadBody[arrField] = payloadBody[arrField]
-        .map((it: any, idx: number) => {
-          if (!it || typeof it !== "object") return it;
-          // If the item already has an id (or Id) assume it's an intended patch and keep it
-          if (it.id != null || it.Id != null) return it;
-          // Otherwise merge with the corresponding full item from the form by index (fallback to item)
-          const full = originalArray[idx] ?? {};
-          return { ...full, ...it };
-        })
-        // remove any accidental null/undefined items
-        .filter(Boolean);
-    }
-  } else {
-    for (const key of allowed) {
-      if (allValues[key] !== undefined) payloadBody[key] = allValues[key];
-    }
-  }
+    let payloadBody: Record<string, any> = {};
+    if (Object.keys(dirtyData).length > 0) {
+      payloadBody = pickAllowed(dirtyData);
 
-  if (Object.keys(payloadBody).length === 0) {
-    alert("Nothing to save for this step.");
-    return;
-  }
-
-  // Always include verifiedEmail and tell server this is not the final submit
-  const payload = {
-    ...payloadBody,
-    verifiedEmail,
-    isFinalSubmit: false,
-  };
-
-  try {
-    setIsSubmitting(true);
-    const res = await fetch("/api/supplier-registration/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || "Failed to save progress.");
-    alert(result.message || "Progress saved");
-    // Reset form dirty state to current values
-    reset(getValues());
-    if (result.savedData?.completedSteps) setCompletedSteps(result.savedData.completedSteps);
-
-    // ===== AFTER SUCCESSFUL SAVE: perform S3 deletions for questionnaire-marked files =====
-    try {
-      const filesToDelete = (getValues()?.questionnaire?.__filesToDelete) ?? [];
-      if (Array.isArray(filesToDelete) && filesToDelete.length > 0) {
-        // Call delete helper
-        const delRes = await deleteS3Files(filesToDelete);
-        if (!delRes.ok) {
-          console.warn("Some S3 deletions failed:", delRes);
-          // Optionally: store delRes.data for retry, or surface to user
-        } else {
-          // On success, clear deletion list from form so we don't re-delete
-          setValue("questionnaire.__filesToDelete", [], { shouldDirty: false });
+      const arrayFields = ["contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"];
+      for (const arrField of arrayFields) {
+        // If allowed and not present in payload, add the full array
+        if (allowed.includes(arrField) && !(arrField in payloadBody) && Array.isArray(allValues[arrField]) && allValues[arrField].length > 0) {
+          payloadBody[arrField] = allValues[arrField];
         }
       }
-    } catch (err) {
-      console.error("Error deleting marked S3 files after save:", err);
-    }
-    // ===== end S3 deletion block =====
 
-  } catch (err: any) {
-    alert(`Save failed: ${err.message}`);
-    console.error("Save error details:", err);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      // ---- NEW: For any arrays we are PATCHING (i.e. present in payloadBody),
+      // merge partial items with the full item from allValues by index (if available)
+      // so server doesn't receive tiny partial objects that replace the whole array.
+      const arrayFieldsToNormalize = ["contacts", "addresses", "businessDocuments", "bankAccounts", "productsAndServices"];
+      for (const arrField of arrayFieldsToNormalize) {
+        if (!Array.isArray(payloadBody[arrField])) continue;
+        const originalArray = Array.isArray(allValues[arrField]) ? allValues[arrField] : [];
+        payloadBody[arrField] = payloadBody[arrField]
+          .map((it: any, idx: number) => {
+            if (!it || typeof it !== "object") return it;
+            // If the item already has an id (or Id) assume it's an intended patch and keep it
+            if (it.id != null || it.Id != null) return it;
+            // Otherwise merge with the corresponding full item from the form by index (fallback to item)
+            const full = originalArray[idx] ?? {};
+            return { ...full, ...it };
+          })
+          // remove any accidental null/undefined items
+          .filter(Boolean);
+      }
+    } else {
+      for (const key of allowed) {
+        if (allValues[key] !== undefined) payloadBody[key] = allValues[key];
+      }
+    }
+
+    if (Object.keys(payloadBody).length === 0) {
+      alert("Nothing to save for this step.");
+      return;
+    }
+
+    // Always include verifiedEmail and tell server this is not the final submit
+    const payload = {
+      ...payloadBody,
+      verifiedEmail,
+      isFinalSubmit: false,
+    };
+
+    try {
+      setIsSubmitting(true);
+      const res = await fetch("/api/supplier-registration/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to save progress.");
+      alert(result.message || "Progress saved");
+      // Reset form dirty state to current values
+      reset(getValues());
+      if (result.savedData?.completedSteps) setCompletedSteps(result.savedData.completedSteps);
+
+      // ===== AFTER SUCCESSFUL SAVE: perform S3 deletions for questionnaire-marked files =====
+      try {
+        const filesToDelete = (getValues()?.questionnaire?.__filesToDelete) ?? [];
+        if (Array.isArray(filesToDelete) && filesToDelete.length > 0) {
+          // Call delete helper
+          const delRes = await deleteS3Files(filesToDelete);
+          if (!delRes.ok) {
+            console.warn("Some S3 deletions failed:", delRes);
+            // Optionally: store delRes.data for retry, or surface to user
+          } else {
+            // On success, clear deletion list from form so we don't re-delete
+            setValue("questionnaire.__filesToDelete", [], { shouldDirty: false });
+          }
+        }
+      } catch (err) {
+        console.error("Error deleting marked S3 files after save:", err);
+      }
+      // ===== end S3 deletion block =====
+
+    } catch (err: any) {
+      alert(`Save failed: ${err.message}`);
+      console.error("Save error details:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleNext = async () => {
     const fieldsToValidate = stepValidationFields[currentStep] || [];
@@ -388,7 +388,8 @@ const handleSaveProgress = async () => {
         },
         (errors) => {
           console.log("handleSubmit validation errors:", errors);
-          alert("Validation failed. Please check the form for errors.");
+          const errorMessages = Object.keys(errors).join(", ");
+          alert(`Validation failed. Errors in fields: ${errorMessages}`);
         }
       )();
     } catch (err) {
@@ -423,13 +424,12 @@ const handleSaveProgress = async () => {
                         type="button"
                         disabled={!completedSteps.includes(index) && index > currentStep}
                         onClick={() => setCurrentStep(index)}
-                        className={`flex items-center space-x-3 p-3 text-left rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                          currentStep === index
-                            ? "bg-primary text-primary-foreground shadow-md"
-                            : completedSteps.includes(index)
+                        className={`flex items-center space-x-3 p-3 text-left rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${currentStep === index
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : completedSteps.includes(index)
                             ? "bg-green-50 text-green-800 hover:bg-green-100"
                             : "bg-gray-100 hover:bg-gray-200"
-                        }`}
+                          }`}
                       >
                         {completedSteps.includes(index) ? (
                           <CheckCircle className="h-5 w-5 text-green-600" />
@@ -473,35 +473,34 @@ const handleSaveProgress = async () => {
                 ) : (
                   <>
                     <Button
-  type="button"
-  variant="secondary"
-  onClick={handleSaveProgress}
-  disabled={isSubmitting}
->
-  Save Progress
-</Button>
+                      type="button"
+                      variant="secondary"
+                      onClick={handleSaveProgress}
+                      disabled={isSubmitting}
+                    >
+                      Save Progress
+                    </Button>
 
-<Button
-  type="button"
-  className={`bg-green-600 hover:bg-green-700 ${
-    isSubmitting || !allQuestionnaireComplete ? "opacity-60 cursor-not-allowed" : ""
-  }`}
-  onClick={async () => {
-    if (!allQuestionnaireComplete) {
-      alert("Please complete all questionnaire sections before submitting.");
-      return;
-    }
-    await submitRegistration();
-  }}
-  disabled={isSubmitting || !allQuestionnaireComplete}
-  title={
-    !allQuestionnaireComplete
-      ? "Complete all questionnaire sections to enable submission"
-      : undefined
-  }
->
-  {isSubmitting ? "Submitting..." : "Submit Registration"}
-</Button>
+                    <Button
+                      type="button"
+                      className={`bg-green-600 hover:bg-green-700 ${isSubmitting || !allQuestionnaireComplete ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
+                      onClick={async () => {
+                        if (!allQuestionnaireComplete) {
+                          alert("Please complete all questionnaire sections before submitting.");
+                          return;
+                        }
+                        await submitRegistration();
+                      }}
+                      disabled={isSubmitting || !allQuestionnaireComplete}
+                      title={
+                        !allQuestionnaireComplete
+                          ? "Complete all questionnaire sections to enable submission"
+                          : undefined
+                      }
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit Registration"}
+                    </Button>
                   </>
                 )}
               </div>

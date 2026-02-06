@@ -40,13 +40,15 @@ export async function POST(req: NextRequest, context: any) {
     // create modification request
     const mr = await prisma.modificationRequest.create({
       data: {
-        brfqId: id,
-        requestedBy,
-        requestedFields,
-        summary,
-        note,
+        rfqId: String(id),
+        supplierId: requestedBy || "unknown",
+        // requestedBy,
+        // requestedFields,
+        // summary,
+        reason: note || "Modification requested",
+        field: (requestedFields[0] as string) || "general",
         status: "pending",
-        createdAt: new Date(),
+        // createdAt: new Date(),
       },
     });
 

@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       prisma.modificationRequest.count({ where }),
       prisma.modificationRequest.findMany({
         where,
-        orderBy: { requestedAt: "desc" },
+        orderBy: { createdAt: "desc" },
         skip: offset,
         take: limit,
         include: {
@@ -46,10 +46,10 @@ export async function GET(req: NextRequest) {
             },
           },
           // your schema uses `approvals` field on ModificationRequest
-          approvals: {
-            orderBy: { actedAt: "asc" },
-            select: { id: true, action: true, actedBy: true, actedAt: true, note: true },
-          },
+          // approvals: {
+          //   orderBy: { actedAt: "asc" },
+          //   select: { id: true, action: true, actedBy: true, actedAt: true, note: true },
+          // },
         },
       }),
     ]);

@@ -9,8 +9,11 @@ export async function middleware(request: NextRequest) {
   // Define paths that are publicly accessible
   const publicPaths = [
     '/sign-in',
-    '/supplier-registration', 
+    '/sign-up',
+    '/supplier-registration',
     '/supplier-verify',
+    '/approval/verify',
+    '/recover',
     // Add other public paths here, e.g., '/', '/about'
   ];
 

@@ -1,7 +1,7 @@
-import RfpLayout from "./RfpLayout";
+import RfpEventLayout from "@/components/rfp-design/RfpEventLayout";
 
 export default async function RfpPage({ params }: any) {
-  const { id } = params; // ✅ Do not await, id is a string here
+  const { id } = await params;
 
   const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rfp/${id}`, {
     cache: "no-store",
@@ -13,5 +13,5 @@ export default async function RfpPage({ params }: any) {
 
   const procurement = await res.json();
 
-  return <RfpLayout procurement={procurement} />;
+  return <RfpEventLayout procurement={procurement} />;
 }

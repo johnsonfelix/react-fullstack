@@ -9,9 +9,10 @@ export async function POST(req: Request) {
     // Create the deliverable and attach to ProcurementRequest
     const deliverable = await prisma.scopeOfWorkDeliverable.create({
       data: {
-        title,
-        description,
-        procurement: { connect: { id: rfpId } },
+        text: title,
+        // title,
+        // description,
+        procurementRequest: { connect: { id: rfpId } },
       },
     });
 

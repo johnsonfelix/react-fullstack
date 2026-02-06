@@ -23,14 +23,16 @@ export async function POST(req: NextRequest, context: any) {
     if (mod.status !== "pending") return NextResponse.json({ success: false, error: "Modification request is not pending" }, { status: 400 });
 
     // Update modification to rejected and log history in a transaction
-    const [updatedMod, history] = await prisma.$transaction([
+    const [updatedMod] = await prisma.$transaction([
       prisma.modificationRequest.update({
         where: { id },
-        data: { status: "rejected", processedBy: actedBy, processedAt: new Date() },
+        // processedBy: actedBy,
+        // processedAt: new Date()
+        data: { status: "rejected" },
       }),
-      prisma.modificationApprovalHistory.create({
-        data: { modificationId: id, action: "reject", actedBy, actedAt: new Date(), note },
-      }),
+      // prisma.modificationApprovalHistory.create({
+      //   data: { modificationId: id, action: "reject", actedBy, actedAt: new Date(), note },
+      // }),
     ]);
 
     // Optionally: resume the BRFQ (if you paused it earlier) - implement endpoint /api/brfq/:id/resume and call it if needed

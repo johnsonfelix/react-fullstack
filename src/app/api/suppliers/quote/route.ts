@@ -26,7 +26,7 @@ async function saveFiles(files: formidable.File[] | formidable.File | undefined)
     const dest = path.join(uploadDir, filename);
     await fs.promises.copyFile(f.filepath, dest);
     saved.push(`/uploads/${filename}`);
-    try { if (fs.existsSync(f.filepath)) await fs.promises.unlink(f.filepath); } catch {}
+    try { if (fs.existsSync(f.filepath)) await fs.promises.unlink(f.filepath); } catch { }
   }
   return saved;
 }
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
           create: (Array.isArray(items) ? items.map((it: any) => ({
             supplierPartNo: it.supplierPartNo ?? (it.itemRef ? String(it.itemRef) : ''),
             deliveryDays: it.deliveryDays ?? '',
-            unitPrice: (it.unitPrice !== undefined && it.unitPrice !== null) ? String(it.unitPrice) : '',
+            unitPrice: (it.unitPrice !== undefined && it.unitPrice !== null) ? Number(it.unitPrice) : 0,
             qty: it.qty ?? '',
             uom: it.uom ?? '',
             cost: Number(it.cost ?? 0),

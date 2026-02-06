@@ -4,6 +4,8 @@ import { PrismaClient } from "@prisma/client";
 import { supplierRegistrationSchema } from "@/app/lib/zod-schemas/supplier-registration-schema";
 import { merge } from "lodash";
 import crypto from "crypto";
+import { hash } from "bcrypt";
+import nodemailer from "nodemailer";
 
 const prisma = new PrismaClient();
 
@@ -46,12 +48,12 @@ function sanitizeAddressesForValidation(payload: any) {
       ...a,
       usage: {
         receivePurchaseOrders: !!usage.receivePurchaseOrders,
-        receivePayments:        !!usage.receivePayments,
-        bidOnRFQs:              !!usage.bidOnRFQs,
+        receivePayments: !!usage.receivePayments,
+        bidOnRFQs: !!usage.bidOnRFQs,
       },
       associatedContacts: Array.isArray(a?.associatedContacts)
-                            ? a.associatedContacts.filter(Boolean)
-                            : [],
+        ? a.associatedContacts.filter(Boolean)
+        : [],
     };
   });
 }
@@ -479,6 +481,77 @@ export async function POST(req: NextRequest) {
 
     const responseReference = persistedFinalData?.registrationReference ?? finalSupplier?.registrationReference ?? null;
     const registrationSubmittedAt = persistedFinalData?.registrationSubmittedAt ?? finalSupplier?.registrationSubmittedAt ?? null;
+
+    // --- AUTO-CREATE USER ACCOUNT IF FINAL SUBMIT ---
+    if (isFinalSubmit && finalSupplier) {
+      try {
+        const userExists = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: verifiedEmail },
+              { supplierId: finalSupplier.id }
+            ]
+          }
+        });
+
+        if (!userExists) {
+          const tempPassword = "Password@123"; // Default password as per requirement
+          const hashedPassword = await hash(tempPassword, 10);
+
+          // Generate username
+          let username = finalSupplier.companyName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 15) + crypto.randomInt(100, 999);
+
+          // Ensure uniqueness
+          while (await prisma.user.findUnique({ where: { username } })) {
+            username = finalSupplier.companyName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 15) + crypto.randomInt(100, 999);
+          }
+
+          await prisma.user.create({
+            data: {
+              email: verifiedEmail,
+              username: username,
+              password: hashedPassword,
+              type: "SUPPLIER",
+              supplierId: finalSupplier.id,
+              profileCompleted: true
+            }
+          });
+
+          // Send Email
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS,
+            },
+          });
+
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: verifiedEmail,
+            subject: 'Supplier Registration Successful - Login Credentials',
+            html: `
+                <div style="font-family: sans-serif; padding: 20px;">
+                  <h2>Registration Successful!</h2>
+                  <p>Thank you for submitting your supplier registration. Your reference number is <strong>${responseReference}</strong>.</p>
+                  <p>We have created a user account for you to access the portal:</p>
+                  <ul>
+                    <li><strong>Username:</strong> ${username}</li>
+                    <li><strong>Password:</strong> ${tempPassword}</li>
+                  </ul>
+                  <p>Please log in and change your password.</p>
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL}/sign-in">Login Here</a>
+                </div>
+                `
+          });
+          console.log(`User created for supplier: ${verifiedEmail}`);
+        }
+      } catch (err) {
+        console.error("Error creating auto-user:", err);
+        // Don't fail the request, just log it. The registration itself was successful.
+      }
+    }
+    // ------------------------------------------------
 
     return NextResponse.json({
       message,

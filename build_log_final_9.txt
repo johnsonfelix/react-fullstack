@@ -1,0 +1,220 @@
+
+> full-stack@0.1.0 build
+> next build
+
+   ▲ Next.js 15.3.1
+   - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 6.0s
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/139) ...
+   Generating static pages (34/139) 
+   Generating static pages (69/139) 
+   Generating static pages (104/139) 
+ ✓ Generating static pages (139/139)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                                       Size  First Load JS
+┌ ƒ /                                                           5.9 kB         120 kB
+├ ○ /_not-found                                                  990 B         102 kB
+├ ○ /add-post                                                  1.03 kB         106 kB
+├ ƒ /admin                                                       434 B         102 kB
+├ ○ /administration                                              396 B         102 kB
+├ ○ /administration/address                                    3.17 kB         117 kB
+├ ○ /administration/address/create                               810 B         102 kB
+├ ○ /administration/approvers                                  2.94 kB         104 kB
+├ ○ /administration/approvers-flow                             3.62 kB         124 kB
+├ ○ /administration/brfq                                       3.58 kB         105 kB
+├ ○ /administration/categories                                 2.42 kB         104 kB
+├ ○ /administration/fields/carrier                             1.02 kB         106 kB
+├ ○ /administration/fields/carrier/create                      1.75 kB         103 kB
+├ ○ /administration/fields/currency                            1.02 kB         106 kB
+├ ○ /administration/fields/currency/create                     1.75 kB         103 kB
+├ ○ /administration/fields/incoterms                           1.02 kB         106 kB
+├ ○ /administration/fields/incoterms/create                    1.75 kB         103 kB
+├ ○ /administration/fields/payment                             1.02 kB         106 kB
+├ ○ /administration/fields/payment/create                      1.75 kB         103 kB
+├ ○ /administration/fields/serviceType                         1.02 kB         106 kB
+├ ○ /administration/fields/serviceType/create                  1.75 kB         103 kB
+├ ○ /administration/fields/shipping                            1.02 kB         106 kB
+├ ○ /administration/fields/shipping/create                     1.75 kB         103 kB
+├ ○ /administration/fields/uom                                 1.02 kB         106 kB
+├ ○ /administration/fields/uom/create                          1.75 kB         103 kB
+├ ○ /administration/fields/urgency                             1.02 kB         106 kB
+├ ○ /administration/fields/urgency/create                      1.75 kB         103 kB
+├ ○ /administration/procurement-leads                          3.64 kB         105 kB
+├ ○ /administration/projects                                     434 B         102 kB
+├ ○ /administration/questionnaires                             2.86 kB         108 kB
+├ ƒ /administration/questionnaires/[id]                        2.23 kB         107 kB
+├ ƒ /administration/questionnaires/[id]/edit                   5.85 kB         111 kB
+├ ○ /administration/questionnaires/new                         5.69 kB         107 kB
+├ ○ /administration/rfq                                        2.69 kB         104 kB
+├ ○ /administration/rfq/workflow                                 434 B         102 kB
+├ ○ /administration/rfq/workflow/approval                      2.53 kB         104 kB
+├ ○ /administration/rfq/workflow/award                         2.11 kB         124 kB
+├ ○ /administration/rfq/workflow/config                          576 B         102 kB
+├ ○ /administration/rfq/workflow/modification                  2.67 kB         104 kB
+├ ○ /administration/rfq/workflow/pause                         1.54 kB         103 kB
+├ ○ /administration/supplier-groups                              831 B         102 kB
+├ ○ /administration/supplier-invite                            1.01 kB         102 kB
+├ ○ /administration/suppliers                                  3.57 kB         108 kB
+├ ƒ /administration/suppliers/[id]                             3.02 kB         114 kB
+├ ○ /administration/suppliers/create                           1.12 kB         103 kB
+├ ○ /administration/terms                                      2.55 kB         113 kB
+├ ƒ /api/add-post                                                434 B         102 kB
+├ ƒ /api/address                                                 434 B         102 kB
+├ ƒ /api/address/[id]                                            434 B         102 kB
+├ ƒ /api/admin/approval-rules                                    434 B         102 kB
+├ ƒ /api/admin/approval-rules/[id]                               434 B         102 kB
+├ ƒ /api/admin/brfqs                                             434 B         102 kB
+├ ƒ /api/admin/brfqs/[id]/approve                                434 B         102 kB
+├ ƒ /api/admin/brfqs/[id]/reject                                 434 B         102 kB
+├ ƒ /api/admin/modification-requests                             434 B         102 kB
+├ ƒ /api/admin/modification-requests/[id]/approve                434 B         102 kB
+├ ƒ /api/admin/modification-requests/[id]/reject                 434 B         102 kB
+├ ƒ /api/admin/modification-rules                                434 B         102 kB
+├ ƒ /api/admin/pause-reasons                                     434 B         102 kB
+├ ƒ /api/admin/pause-reasons/[id]                                434 B         102 kB
+├ ƒ /api/admin/pause-reasons/[id]/pause                          434 B         102 kB
+├ ƒ /api/admin/pause-reasons/[id]/resume                         434 B         102 kB
+├ ƒ /api/admin/workflow/award                                    434 B         102 kB
+├ ƒ /api/administration/fields/carrier                           434 B         102 kB
+├ ƒ /api/administration/fields/carrier/[id]                      434 B         102 kB
+├ ƒ /api/administration/fields/currency                          434 B         102 kB
+├ ƒ /api/administration/fields/currency/[id]                     434 B         102 kB
+├ ƒ /api/administration/fields/incoterms                         434 B         102 kB
+├ ƒ /api/administration/fields/incoterms/[id]                    434 B         102 kB
+├ ƒ /api/administration/fields/payment                           434 B         102 kB
+├ ƒ /api/administration/fields/payment/[id]                      434 B         102 kB
+├ ƒ /api/administration/fields/serviceType                       434 B         102 kB
+├ ƒ /api/administration/fields/serviceType/[id]                  434 B         102 kB
+├ ƒ /api/administration/fields/shipping                          434 B         102 kB
+├ ƒ /api/administration/fields/shipping/[id]                     434 B         102 kB
+├ ƒ /api/administration/fields/uom                               434 B         102 kB
+├ ƒ /api/administration/fields/uom/[id]                          434 B         102 kB
+├ ƒ /api/administration/fields/urgency                           434 B         102 kB
+├ ƒ /api/administration/fields/urgency/[id]                      434 B         102 kB
+├ ƒ /api/administration/options                                  434 B         102 kB
+├ ƒ /api/administration/procurement-leads                        434 B         102 kB
+├ ƒ /api/administration/procurement-leads/[id]                   434 B         102 kB
+├ ƒ /api/administration/questionnaire-categories                 434 B         102 kB
+├ ƒ /api/administration/questionnaire-categories/[categoryId]    434 B         102 kB
+├ ƒ /api/administration/questionnaire-templates                  434 B         102 kB
+├ ƒ /api/administration/questionnaire-templates/[id]             434 B         102 kB
+├ ƒ /api/administration/workflow-template                        434 B         102 kB
+├ ƒ /api/ai/generate-ai-questions                                434 B         102 kB
+├ ƒ /api/ai/generate-deliverables                                434 B         102 kB
+├ ƒ /api/ai/generate-evaluation                                  434 B         102 kB
+├ ƒ /api/ai/generate-items                                       434 B         102 kB
+├ ƒ /api/ai/intake-chat                                          434 B         102 kB
+├ ƒ /api/ai/rekognition                                          434 B         102 kB
+├ ƒ /api/ai/request-type                                         434 B         102 kB
+├ ƒ /api/ai/rewrite-sow                                          434 B         102 kB
+├ ƒ /api/ai/sow                                                  434 B         102 kB
+├ ƒ /api/approval/action                                         434 B         102 kB
+├ ƒ /api/approval/verify                                         434 B         102 kB
+├ ƒ /api/approvers                                               434 B         102 kB
+├ ƒ /api/auth/[...nextauth]                                      434 B         102 kB
+├ ƒ /api/auth/generate-otp                                       434 B         102 kB
+├ ƒ /api/auth/recover-account                                    434 B         102 kB
+├ ƒ /api/auth/verify-otp                                         434 B         102 kB
+├ ƒ /api/auth/verify-registration-token                          434 B         102 kB
+├ ƒ /api/auth/verify-token                                       434 B         102 kB
+├ ƒ /api/awards/[id]/approve                                     434 B         102 kB
+├ ƒ /api/awards/brfq/[brfqId]                                    434 B         102 kB
+├ ƒ /api/awards/initiate                                         434 B         102 kB
+├ ƒ /api/brfq                                                    434 B         102 kB
+├ ƒ /api/brfq/[id]                                               434 B         102 kB
+├ ƒ /api/brfq/[id]/modification-request                          434 B         102 kB
+├ ƒ /api/brfq/draft                                              434 B         102 kB
+├ ƒ /api/brfq/generate-id                                        434 B         102 kB
+├ ƒ /api/categories                                              434 B         102 kB
+├ ƒ /api/categories/[id]                                         434 B         102 kB
+├ ƒ /api/categories/[id]/suppliers                               434 B         102 kB
+├ ƒ /api/categories/search                                       434 B         102 kB
+├ ƒ /api/debug-users                                             434 B         102 kB
+├ ƒ /api/lib/verify-quote-token                                  434 B         102 kB
+├ ƒ /api/options/brfq                                            434 B         102 kB
+├ ƒ /api/post/[id]                                               434 B         102 kB
+├ ƒ /api/procurement                                             434 B         102 kB
+├ ƒ /api/procurement/[id]                                        434 B         102 kB
+├ ƒ /api/procurement/[id]/suppliers                              434 B         102 kB
+├ ƒ /api/procurement/add-deliverable                             434 B         102 kB
+├ ƒ /api/procurement/add-supplier                                434 B         102 kB
+├ ƒ /api/procurement/create                                      434 B         102 kB
+├ ƒ /api/procurement/evaluation-criteria                         434 B         102 kB
+├ ƒ /api/procurement/evaluation-criteria/[id]                    434 B         102 kB
+├ ƒ /api/procurement/procurement-request                         434 B         102 kB
+├ ƒ /api/product-categories                                      434 B         102 kB
+├ ƒ /api/product-categories/[id]                                 434 B         102 kB
+├ ƒ /api/questions                                               434 B         102 kB
+├ ƒ /api/rfp-questions                                           434 B         102 kB
+├ ƒ /api/rfp/[id]                                                434 B         102 kB
+├ ƒ /api/rfp/[id]/publish                                        434 B         102 kB
+├ ƒ /api/rfp/[id]/submit                                         434 B         102 kB
+├ ƒ /api/s3/delete                                               434 B         102 kB
+├ ƒ /api/seed                                                    434 B         102 kB
+├ ƒ /api/send-invitation                                         434 B         102 kB
+├ ƒ /api/supplier                                                434 B         102 kB
+├ ƒ /api/supplier-registration/load                              434 B         102 kB
+├ ƒ /api/supplier-registration/questionnaire                     434 B         102 kB
+├ ƒ /api/supplier-registration/save                              434 B         102 kB
+├ ƒ /api/supplier/[supplierId]/addresses                         434 B         102 kB
+├ ƒ /api/supplier/[supplierId]/approve                           434 B         102 kB
+├ ƒ /api/supplier/[supplierId]/bank-accounts                     434 B         102 kB
+├ ƒ /api/supplier/[supplierId]/business-documents                434 B         102 kB
+├ ƒ /api/supplier/[supplierId]/contacts                          434 B         102 kB
+├ ƒ /api/supplier/[supplierId]/product-categories                434 B         102 kB
+├ ƒ /api/supplier/[supplierId]/questionnaire                     434 B         102 kB
+├ ƒ /api/supplier/acknowledge                                    434 B         102 kB
+├ ƒ /api/supplier/dashboard                                      434 B         102 kB
+├ ƒ /api/supplier/quote                                          434 B         102 kB
+├ ƒ /api/supplier/response/save                                  434 B         102 kB
+├ ƒ /api/supplier/rfp/[id]                                       434 B         102 kB
+├ ƒ /api/suppliers                                               434 B         102 kB
+├ ƒ /api/suppliers/quote                                         434 B         102 kB
+├ ƒ /api/test-auth                                               434 B         102 kB
+├ ƒ /api/test-email                                              434 B         102 kB
+├ ƒ /api/upload                                                  434 B         102 kB
+├ ƒ /api/uploads/presign                                         434 B         102 kB
+├ ƒ /api/user                                                    434 B         102 kB
+├ ƒ /api/user/profile                                            434 B         102 kB
+├ ○ /approval/verify                                           2.43 kB         113 kB
+├ ƒ /approver-dashboard                                        1.91 kB         122 kB
+├ ○ /buyer/events/create                                       11.5 kB         275 kB
+├ ƒ /buyer/events/edit/[id]                                    13.5 kB         277 kB
+├ ○ /buyer/events/view                                          1.5 kB         103 kB
+├ ƒ /buyer/rfp/[id]                                              178 B         133 kB
+├ ○ /events                                                    1.78 kB         107 kB
+├ ƒ /events/[id]                                               8.45 kB         133 kB
+├ ○ /intake/new                                                4.48 kB         143 kB
+├ ○ /others/agreement                                            434 B         102 kB
+├ ○ /procurement/new                                             262 B         133 kB
+├ ○ /recover                                                   3.48 kB         152 kB
+├ ○ /rekognition                                               1.08 kB         103 kB
+├ ○ /sign-in                                                   2.65 kB         161 kB
+├ ○ /sign-up                                                   2.63 kB         142 kB
+├ ƒ /supplier-registration                                     52.1 kB         188 kB
+├ ○ /supplier-registration/success                             2.33 kB         104 kB
+├ ○ /supplier-verify                                           2.79 kB         141 kB
+├ ○ /supplier/dashboard                                        2.86 kB         114 kB
+├ ƒ /supplier/rfp/[id]                                         8.64 kB         119 kB
+├ ○ /supplier/submit-quote                                     4.32 kB         106 kB
+├ ○ /test                                                        511 B         102 kB
+├ ○ /testd                                                       434 B         102 kB
+└ ○ /user/create-profile                                       1.04 kB         112 kB
++ First Load JS shared by all                                   101 kB
+  ├ chunks/1684-55200f5a35b42f0d.js                            46.2 kB
+  ├ chunks/4bd1b696-e1c71882f4baf661.js                        53.2 kB
+  └ other shared chunks (total)                                2.04 kB
+
+
+ƒ Middleware                                                   32.5 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

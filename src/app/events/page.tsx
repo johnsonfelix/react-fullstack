@@ -59,7 +59,7 @@ export default function EventsPage() {
       const formattedRfps = (rfpsRaw || []).map((item: any) => ({
         id: item.id,
         title: item.title || 'Untitled RFP',
-        closeDate: item.additionalFields?.closeDate ?? item.closeDate ?? null,
+        closeDate: item.additionalFields?.bidCloseDate ?? item.additionalFields?.closeDate ?? item.closeDate ?? null,
         createdAt: item.createdAt ?? item.created_at ?? new Date().toISOString(),
         eventType: "RFP",
         status: item.status ?? item.state ?? "draft",

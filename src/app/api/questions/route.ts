@@ -8,11 +8,13 @@ export async function POST(req: Request) {
       text: body.text,
       type: body.type || "text",
       required: body.required || false,
-      quantity: body.quantity || null,
-      uom: body.uom || null,
-      benchmark: body.benchmark || null,
-      deliverableId: body.deliverableId,
-      parentQuestionId: body.parentQuestionId || null,
+      order: 0, // Mandatory field
+      // quantity: body.quantity || null,
+      // uom: body.uom || null,
+      // benchmark: body.benchmark || null,
+      // deliverableId: body.deliverableId,
+      procurementRequestId: body.procurementRequestId, // Ensure this is passed or handled
+      // parentQuestionId: body.parentQuestionId || null,
     },
   });
   return NextResponse.json(question);
@@ -26,9 +28,9 @@ export async function PATCH(req: Request) {
       text: body.text,
       type: body.type,
       required: body.required,
-      quantity: body.quantity,
-      uom: body.uom,
-      benchmark: body.benchmark,
+      // quantity: body.quantity,
+      // uom: body.uom,
+      // benchmark: body.benchmark,
     },
   });
   return NextResponse.json(question);

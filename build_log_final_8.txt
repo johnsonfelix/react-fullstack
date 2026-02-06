@@ -1,0 +1,27 @@
+
+> full-stack@0.1.0 build
+> next build
+
+   ▲ Next.js 15.3.1
+   - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 4.0s
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/139) ...
+ ⨯ useSearchParams() should be wrapped in a suspense boundary at page "/approval/verify". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+    at a (D:\Projects\inventory\full-stack\.next\server\chunks\2173.js:3:15252)
+    at d (D:\Projects\inventory\full-stack\.next\server\chunks\2173.js:5:36657)
+    at o (D:\Projects\inventory\full-stack\.next\server\app\approval\verify\page.js:1:2606)
+    at nF (D:\Projects\inventory\full-stack\node_modules\next\dist\compiled\next-server\app-page.runtime.prod.js:76:46843)
+    at nH (D:\Projects\inventory\full-stack\node_modules\next\dist\compiled\next-server\app-page.runtime.prod.js:76:48618)
+    at nW (D:\Projects\inventory\full-stack\node_modules\next\dist\compiled\next-server\app-page.runtime.prod.js:76:67762)
+    at nz (D:\Projects\inventory\full-stack\node_modules\next\dist\compiled\next-server\app-page.runtime.prod.js:76:65337)
+    at nB (D:\Projects\inventory\full-stack\node_modules\next\dist\compiled\next-server\app-page.runtime.prod.js:76:47195)
+    at nH (D:\Projects\inventory\full-stack\node_modules\next\dist\compiled\next-server\app-page.runtime.prod.js:76:48664)
+    at nH (D:\Projects\inventory\full-stack\node_modules\next\dist\compiled\next-server\app-page.runtime.prod.js:76:64688)
+Error occurred prerendering page "/approval/verify". Read more: https://nextjs.org/docs/messages/prerender-error
+Export encountered an error on /approval/verify/page: /approval/verify, exiting the build.
+ ⨯ Next.js build worker exited with code: 1 and signal: null

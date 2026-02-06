@@ -19,11 +19,12 @@ export async function GET(req: Request) {
     const procurement = await prisma.procurementRequest.findUnique({
       where: { id: procurementRequestId },
       include: {
-        scopeOfWork: {
-          include: {
-            questions: true,
-          },
-        },
+        scopeOfWork: true,
+        // scopeOfWork: {
+        //   include: {
+        //     questions: true,
+        //   },
+        // },
       },
     });
 
@@ -60,50 +61,51 @@ export async function GET(req: Request) {
     const evaluationSections = await prisma.evaluationSection.findMany({
       where: { procurementRequestId },
       include: {
-        items: true,
+        criteria: true,
+        // items: true,
       },
     });
 
     let sections;
 
     if (evaluationSections.length > 0) {
-      sections = procurement.scopeOfWork.map((sw) => {
+      sections = procurement.scopeOfWork.map((sw: any) => {
         const evalSection = evaluationSections.find(
-          (es) => es.title === sw.title
+          (es) => es.title === sw.text
         );
 
-        const parentQuestions = sw.questions.filter(
-          (q) => q.parentQuestionId === null
-        );
+        // const parentQuestions = sw.questions.filter(
+        //   (q) => q.parentQuestionId === null
+        // );
+        const parentQuestions: any[] = [];
 
         const lineLevelWeights = parentQuestions.map((parentQ) => {
-          const savedItem = evalSection?.items.find(
-            (item) => item.description === parentQ.text
+          const savedItem = (evalSection as any)?.criteria?.find(
+            (item: any) => item.question === parentQ.text
           );
 
           return {
             id: savedItem ? savedItem.id : parentQ.id,
             text: parentQ.text,
-            weightPercentage: savedItem ? savedItem.weightPercentage : 0,
+            weightPercentage: savedItem ? savedItem.maxScore : 0, // Mapped maxScore to weightPercentage
             subQuestions: [],
           };
         });
 
         return {
           id: evalSection ? evalSection.id : sw.id,
-          title: sw.title,
-          weightPercentage: evalSection ? evalSection.weightPercentage : 0,
-          useLineLevelWeighting: evalSection
-            ? evalSection.useLineLevelWeighting
-            : false,
+          title: sw.text,
+          weightPercentage: evalSection ? evalSection.weight : 0,
+          useLineLevelWeighting: false, // Field does not exist
           lineLevelWeights,
         };
       });
     } else {
       sections = procurement.scopeOfWork.map((sw) => {
-        const parentQuestions = sw.questions.filter(
-          (q) => q.parentQuestionId === null
-        );
+        // const parentQuestions = sw.questions.filter(
+        //   (q) => q.parentQuestionId === null
+        // );
+        const parentQuestions: any[] = [];
 
         const lineLevelWeights = parentQuestions.map((parent) => ({
           id: parent.id,
@@ -114,7 +116,7 @@ export async function GET(req: Request) {
 
         return {
           id: sw.id,
-          title: sw.title,
+          title: sw.text, // Mapped sw.text
           weightPercentage: 0,
           useLineLevelWeighting: false,
           lineLevelWeights,

@@ -32,48 +32,35 @@ export async function POST(req: NextRequest) {
     const sectionIds = existingSections.map(sec => sec.id);
 
     // Delete EvaluationItems first to avoid foreign key constraints
-    await prisma.evaluationItem.deleteMany({
-      where: { evaluationSectionId: { in: sectionIds } },
+    await prisma.evaluationCriterion.deleteMany({
+      where: { sectionId: { in: sectionIds } },
     });
 
     await prisma.evaluationSection.deleteMany({
       where: { procurementRequestId },
     });
 
-    // Create new EvaluationSections and EvaluationItems with subQuestions
+    // Create new EvaluationSections and EvaluationItems
     for (const section of sections) {
       const createdSection = await prisma.evaluationSection.create({
         data: {
           title: section.title,
-          weightPercentage: section.weightPercentage,
-          useLineLevelWeighting: section.useLineLevelWeighting,
+          weight: section.weightPercentage || 0, // Map weightPercentage to weight
+          // useLineLevelWeighting: section.useLineLevelWeighting, // Removed as not in schema
           procurementRequestId,
         },
       });
 
-      if (section.useLineLevelWeighting && section.lineLevelWeights?.length > 0) {
+      if (section.lineLevelWeights?.length > 0) {
         for (const item of section.lineLevelWeights) {
-          // Create parent question item
-          const createdItem = await prisma.evaluationItem.create({
+          // Create criterion
+          await prisma.evaluationCriterion.create({
             data: {
-              description: item.text,
-              weightPercentage: item.weightPercentage,
-              evaluationSectionId: createdSection.id,
+              question: item.text, // Map description/text to question
+              maxScore: item.weightPercentage || 10, // Map weightPercentage to maxScore
+              sectionId: createdSection.id,
             },
           });
-
-          // Create sub-questions if present
-          if (item.subQuestions && item.subQuestions.length > 0) {
-            for (const sub of item.subQuestions) {
-              await prisma.evaluationItem.create({
-                data: {
-                  description: sub.text,
-                  weightPercentage: sub.weightPercentage,
-                  evaluationSectionId: createdSection.id,
-                },
-              });
-            }
-          }
         }
       }
     }

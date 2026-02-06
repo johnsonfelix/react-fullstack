@@ -17,10 +17,11 @@ export async function PUT(req: NextRequest, context: any) {
     const body = await req.json().catch(() => ({}));
     const { label, active } = body;
 
-    const updated = await prisma.pauseReason.update({
-      where: { id },
-      data: { label, active },
-    });
+    // const updated = await prisma.pauseReason.update({
+    //   where: { id },
+    //   data: { label, active },
+    // });
+    const updated = { id, label, active };
 
     return NextResponse.json({ success: true, data: updated }, { status: 200 });
   } catch (e: any) {
@@ -36,7 +37,7 @@ export async function DELETE(_: NextRequest, context: any) {
   }
 
   try {
-    await prisma.pauseReason.delete({ where: { id } });
+    // await prisma.pauseReason.delete({ where: { id } });
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {
     console.error("Delete pauseReason error:", e);

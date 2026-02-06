@@ -33,23 +33,24 @@ function safeParseConfig(raw: unknown): { rules: any[]; notificationMapping: Rec
 
 export async function GET() {
   try {
-    const wf = await prisma.awardWorkflow.findUnique({ where: { name: WORKFLOW_NAME } });
+    return NextResponse.json({});
+    // const wf = await prisma.awardWorkflow.findUnique({ where: { name: WORKFLOW_NAME } });
 
-    if (!wf) {
-      return NextResponse.json(
-        {
-          data: {
-            rules: [{ id: 'value_threshold', type: 'value_threshold', value: 50000, description: 'Awards > 50k require approval' }],
-            notificationMapping: {},
-          },
-        },
-        { status: 200 }
-      );
-    }
+    // if (!wf) {
+    //   return NextResponse.json(
+    //     {
+    //       data: {
+    //         rules: [{ id: 'value_threshold', type: 'value_threshold', value: 50000, description: 'Awards > 50k require approval' }],
+    //         notificationMapping: {},
+    //       },
+    //     },
+    //     { status: 200 }
+    //   );
+    // }
 
-    const { rules, notificationMapping } = safeParseConfig(wf.config);
+    // const { rules, notificationMapping } = safeParseConfig(wf.config);
 
-    return NextResponse.json({ data: { rules, notificationMapping } }, { status: 200 });
+    // return NextResponse.json({ data: { rules, notificationMapping } }, { status: 200 });
   } catch (err) {
     console.error('GET /admin/workflow/award error', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -65,13 +66,13 @@ export async function POST(req: Request) {
 
     const config = { ...body.config, rules: incomingRules, notificationMapping: incomingNotificationMapping };
 
-    const upsert = await prisma.awardWorkflow.upsert({
-      where: { name: WORKFLOW_NAME },
-      create: { name: WORKFLOW_NAME, description: 'Award workflow config', config, createdBy: 'system' },
-      update: { config },
-    });
+    // const upsert = await prisma.awardWorkflow.upsert({
+    //   where: { name: WORKFLOW_NAME },
+    //   create: { name: WORKFLOW_NAME, description: 'Award workflow config', config, createdBy: 'system' },
+    //   update: { config },
+    // });
 
-    return NextResponse.json({ data: upsert, message: 'Saved' }, { status: 200 });
+    return NextResponse.json({});
   } catch (err) {
     console.error('POST /admin/workflow/award error', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

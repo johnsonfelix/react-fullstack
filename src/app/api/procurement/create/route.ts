@@ -24,28 +24,35 @@ export async function POST(req: Request) {
         category: body.category,
         address: body.address,
         status: body.status || "draft",
+        additionalFields: {
+          ...(body.additionalFields || {}),
+          bidOpenDate: body.bidOpenDate,
+          bidCloseDate: body.bidCloseDate,
+          clarificationDate: body.clarificationDate
+        },
+        attachments: body.attachments ? body.attachments : undefined,
         aiQuestions: body.aiQuestions ? body.aiQuestions : undefined, // ✅ NEW: Save AI questions JSON if provided
 
         scopeOfWork: body.scopeOfWork
           ? {
-              create: body.scopeOfWork.map((sow: any) => ({
-                title: sow.title,
-                description: sow.description,
-                userInstruction: sow.userInstruction || null,
-              })),
-            }
+            create: body.scopeOfWork.map((sow: any) => ({
+              title: sow.title,
+              description: sow.description,
+              userInstruction: sow.userInstruction || null,
+            })),
+          }
           : undefined,
 
         items: body.items
           ? {
-              create: body.items.map((item: any) => ({
-                title: item.title,
-                quantity: item.quantity,
-                price: item.price,
-                manufacturerPartNo: item.manufacturerPartNumber,
-                uom: item.uom
-              })),
-            }
+            create: body.items.map((item: any) => ({
+              title: item.title,
+              quantity: parseInt(item.quantity, 10),
+              price: item.price ? parseInt(item.price, 10) : undefined,
+              manufacturerPartNo: item.manufacturerPartNumber,
+              uom: item.uom
+            })),
+          }
           : undefined,
       },
       include: {

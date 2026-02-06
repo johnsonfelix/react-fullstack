@@ -9,14 +9,14 @@ type Supplier = any; // keep flexible — adapt types if you want stricter typin
 export default function AdminSupplierList() {
   const router = useRouter();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [filterStatus, setFilterStatus] = useState<'all'|'pending'|'approved'|'rejected'>('pending');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [query, setQuery] = useState('');
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
 
   // modals
   const [showDetailsFor, setShowDetailsFor] = useState<string | null>(null);
   const [showActionModal, setShowActionModal] = useState<{
-    mode: 'reject'|'request'|'approve'|null;
+    mode: 'reject' | 'request' | 'approve' | null;
     supplierId?: string | null;
   }>({ mode: null });
   const [actionMessage, setActionMessage] = useState('');
@@ -25,24 +25,40 @@ export default function AdminSupplierList() {
     fetchSuppliers();
   }, []);
 
- const fetchSuppliers = async () => {
-  try {
-    const res = await fetch('/api/supplier', { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to load suppliers');
-    const json = await res.json();
+  const fetchSuppliers = async () => {
+    try {
+      const res = await fetch('/api/supplier', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load suppliers');
+      const json = await res.json();
 
-    // Accept either an array (legacy) or { data: [...], meta: {...} } (new)
-    const supplierList = Array.isArray(json)
-      ? json
-      : Array.isArray(json.data)
-      ? json.data
-      : [];
+      const supplierList = Array.isArray(json)
+        ? json
+        : Array.isArray(json.data)
+          ? json.data
+          : [];
 
-    setSuppliers(supplierList);
-  } catch (err) {
-    console.error(err);
-  }
-};
+      setSuppliers(supplierList);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleViewDetails = async (id: string) => {
+    try {
+      setLoadingFor(id, true);
+      const res = await fetch(`/api/supplier?id=${id}`);
+      if (res.ok) {
+        const fullDetails = await res.json();
+        // Update local state with full details for this supplier
+        setSuppliers(prev => prev.map(s => s.id === id ? fullDetails : s));
+        setShowDetailsFor(id);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingFor(id, false);
+    }
+  };
 
   // helper to set loading per supplier
   const setLoadingFor = (id: string, v: boolean) => setLoadingMap(prev => ({ ...prev, [id]: v }));
@@ -198,9 +214,8 @@ export default function AdminSupplierList() {
                   <td className="py-3 px-6 align-top">{s.registrationEmail}</td>
                   <td className="py-3 px-6 align-top">{s.submittedAt ? new Date(s.submittedAt).toLocaleString() : new Date(s.createdAt).toLocaleString()}</td>
                   <td className="py-3 px-6 align-top">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      (s.status || '').toLowerCase() === 'approved' ? 'bg-green-100 text-green-800' : (s.status || '').toLowerCase() === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>{(s.status || 'pending').toUpperCase()}</span>
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${['approved', 'active'].includes((s.status || '').toLowerCase()) ? 'bg-green-100 text-green-800' : (s.status || '').toLowerCase() === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>{(s.status || 'pending').toUpperCase()}</span>
                   </td>
                   <td className="py-3 px-6 align-top">{s.registrationReference || '-'}</td>
                   <td className="py-3 px-6 align-top">
@@ -209,8 +224,12 @@ export default function AdminSupplierList() {
                     <div className="text-xs text-gray-600">Banks: {s.bankAccounts?.length || 0}</div>
                   </td>
                   <td className="py-3 px-6 align-top space-x-2">
-                    <button onClick={() => setShowDetailsFor(s.id)} className="text-sm px-3 py-1 bg-white border rounded">View</button>
-                    <button onClick={() => handleApprove(s.id)} disabled={loadingMap[s.id]} className="text-sm px-3 py-1 bg-green-600 text-white rounded disabled:opacity-60">{loadingMap[s.id] ? '...' : 'Approve'}</button>
+                    <button onClick={() => handleViewDetails(s.id)} disabled={loadingMap[s.id]} className="text-sm px-3 py-1 bg-white border rounded disabled:opacity-50">{loadingMap[s.id] && showDetailsFor !== s.id ? 'Loading...' : 'View'}</button>
+                    {['approved', 'active'].includes((s.status || '').toLowerCase()) ? (
+                      <Link href={`/administration/suppliers/${s.id}`} className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</Link>
+                    ) : (
+                      <button onClick={() => handleApprove(s.id)} disabled={loadingMap[s.id]} className="text-sm px-3 py-1 bg-green-600 text-white rounded disabled:opacity-60">{loadingMap[s.id] ? '...' : 'Approve'}</button>
+                    )}
                     <button onClick={() => openRejectModal(s.id)} className="text-sm px-3 py-1 bg-red-100 text-red-700 rounded">Reject</button>
                     <button onClick={() => openRequestInfoModal(s.id)} className="text-sm px-3 py-1 bg-yellow-100 text-yellow-800 rounded">Request Info</button>
                     <button onClick={() => handleDelete(s.id)} className="text-sm px-3 py-1 bg-red-600 text-white rounded">Delete</button>
@@ -279,17 +298,31 @@ function SupplierDetails({ supplier }: { supplier: Supplier | undefined }) {
           <div className="font-semibold">{supplier.status}</div>
           <div className="text-xs text-gray-500 mt-1">Submitted: {supplier.submittedAt ? new Date(supplier.submittedAt).toLocaleString() : '-'}</div>
         </div>
+        <div className="border rounded p-3 col-span-1 md:col-span-3">
+          <div className="text-xs text-gray-500">Product Categories</div>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {supplier.productCategories && supplier.productCategories.length > 0 ? (
+              supplier.productCategories.map((pc: any, idx: number) => (
+                <span key={idx} className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs border border-blue-100">
+                  {pc.productCategory?.name || "Unknown"}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-400 text-sm italic">No categories assigned</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Panel title="Contacts" items={supplier.contacts || []} renderItem={(c:any)=> (
+        <Panel title="Contacts" items={supplier.contacts || []} renderItem={(c: any) => (
           <div>
             <div className="font-semibold">{c.firstName} {c.lastName}</div>
             <div className="text-xs text-gray-600">{c.designation} · {c.mobile}</div>
           </div>
         )} />
 
-        <Panel title="Addresses" items={supplier.addresses || []} renderItem={(a:any)=> (
+        <Panel title="Addresses" items={supplier.addresses || []} renderItem={(a: any) => (
           <div>
             <div className="font-semibold">{a.type} — {a.city}, {a.country}</div>
             <div className="text-xs text-gray-600">{a.line1} {a.line2 || ''}</div>
@@ -298,14 +331,14 @@ function SupplierDetails({ supplier }: { supplier: Supplier | undefined }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Panel title="Business Documents" items={supplier.businessDocuments || []} renderItem={(d:any)=> (
+        <Panel title="Business Documents" items={supplier.businessDocuments || []} renderItem={(d: any) => (
           <div>
             <div className="font-semibold">{d.classification} — {d.certificateNumber || ''}</div>
             <div className="text-xs text-gray-600">Expires: {d.certificateEndDate ? new Date(d.certificateEndDate).toLocaleDateString() : '—'}</div>
           </div>
         )} />
 
-        <Panel title="Bank Accounts" items={supplier.bankAccounts || []} renderItem={(b:any)=> (
+        <Panel title="Bank Accounts" items={supplier.bankAccounts || []} renderItem={(b: any) => (
           <div>
             <div className="font-semibold">{b.bankName} — {b.accountNumber}</div>
             <div className="text-xs text-gray-600">{b.currency} · {b.accountHolder}</div>
@@ -316,8 +349,8 @@ function SupplierDetails({ supplier }: { supplier: Supplier | undefined }) {
       <div>
         <h4 className="text-sm font-semibold mb-2">Attachments & Files</h4>
         <div className="flex gap-2 flex-wrap">
-          {(supplier.profileAttachments || []).map((p:string,i:number)=> (
-            <a key={i} href={p} target="_blank" rel="noreferrer" className="text-xs underline">File {i+1}</a>
+          {(supplier.profileAttachments || []).map((p: string, i: number) => (
+            <a key={i} href={p} target="_blank" rel="noreferrer" className="text-xs underline">File {i + 1}</a>
           ))}
         </div>
       </div>
@@ -325,7 +358,7 @@ function SupplierDetails({ supplier }: { supplier: Supplier | undefined }) {
   );
 }
 
-function Panel({ title, items, renderItem }: { title: string; items: any[]; renderItem: (item:any)=>React.ReactNode }){
+function Panel({ title, items, renderItem }: { title: string; items: any[]; renderItem: (item: any) => React.ReactNode }) {
   return (
     <div className="border rounded p-3">
       <div className="flex items-center justify-between mb-2">
@@ -333,7 +366,7 @@ function Panel({ title, items, renderItem }: { title: string; items: any[]; rend
         <div className="text-xs text-gray-500">{items.length}</div>
       </div>
       <div className="space-y-2">
-        {items.length === 0 ? <div className="text-xs text-gray-500 italic">None</div> : items.map((it, idx)=> (
+        {items.length === 0 ? <div className="text-xs text-gray-500 italic">None</div> : items.map((it, idx) => (
           <div key={idx} className="text-sm">{renderItem(it)}</div>
         ))}
       </div>

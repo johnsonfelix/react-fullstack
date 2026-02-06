@@ -26,19 +26,24 @@ function getVerifiedEmailFromToken(token: string | undefined | null): string | n
  * Use `props: any` to avoid mismatches with Next's generated PageProps type.
  * We then coerce/extract `searchParams` to the shape we expect.
  */
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
 export default async function SupplierRegistrationPage(props: any) {
-  // Get searchParams safely from props and coerce into our expected shape
-  const searchParams = (props?.searchParams ?? {}) as { token?: string | string[] | undefined };
+  // 1. Check for active session first
+  const session = await getServerSession(authOptions);
+  let verifiedEmail: string | null = null;
 
-  // Next might pass token as string or string[]
-  const rawToken = searchParams?.token;
-  const tokenStr = Array.isArray(rawToken) ? rawToken[0] : rawToken;
-
-  // If token might come as "Bearer <token>", use split() to extract token
-  const cleanedToken = tokenStr?.includes(" ") ? tokenStr.split(" ").pop() ?? undefined : tokenStr;
-
-  // Verify token on server
-  const verifiedEmail = getVerifiedEmailFromToken(cleanedToken ?? undefined);
+  if (session?.user?.email) {
+    verifiedEmail = session.user.email;
+  } else {
+    // 2. Fallback to token validation if no session
+    const searchParams = (props?.searchParams ?? {}) as { token?: string | string[] | undefined };
+    const rawToken = searchParams?.token;
+    const tokenStr = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+    const cleanedToken = tokenStr?.includes(" ") ? tokenStr.split(" ").pop() ?? undefined : tokenStr;
+    verifiedEmail = getVerifiedEmailFromToken(cleanedToken ?? undefined);
+  }
 
   if (!verifiedEmail) {
     return (

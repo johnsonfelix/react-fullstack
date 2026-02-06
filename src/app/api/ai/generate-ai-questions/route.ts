@@ -5,27 +5,60 @@ import { v4 as uuidv4 } from "uuid";
 export async function POST(req: Request) {
   try {
 
-    const { input } = await req.json();
+    const { input, type } = await req.json();
 
-const prompt = `
+    let prompt = "";
+
+    if (type === "esg") {
+      prompt = `
+You are a procurement AI assistant specializing in ESG (Environmental, Social, and Governance).
+
+Generate 5 to 7 **direct, factual ESG-related questions** a procurement officer should ask a supplier.
+
+Instructions:
+- Focus on sustainability, labor practices, diversity, and governance.
+- Respond ONLY in this exact JSON array format:
+[
+  { "question": "Question text", "answer": "Expected or example answer" },
+  ...
+]
+Do not add explanations.
+`.trim();
+    } else if (type === "gdpr") {
+      prompt = `
+You are a procurement AI assistant specializing in Data Privacy and GDPR.
+
+Generate 5 to 7 **direct, factual GDPR compliance questions** a procurement officer should ask a supplier.
+
+Instructions:
+- Focus on data handling, consent, breach notification, and DPO details.
+- Respond ONLY in this exact JSON array format:
+[
+  { "question": "Question text", "answer": "Expected or example answer" },
+  ...
+]
+Do not add explanations.
+`.trim();
+    } else {
+      // Default / Technical
+      prompt = `
 You are a procurement AI assistant.
 
 Generate 5 to 7 **direct, factual answers** a procurement officer should capture about the following requirement, and generate clear questions to elicit these answers.
 
-Requirement: "${input}"
+Requirement/Context: "${input}"
 
 Instructions:
-- Use **concrete example values** in answers, even if assumptions are needed.
-- Do NOT use phrases like "should be specified," "could be," or "to be determined."
+- Use **concrete example values** in answers.
 - Provide **realistic, direct values** a procurement officer would record.
 - Respond ONLY in this exact JSON array format:
 [
-  { "question": "Question 1 text", "answer": "Direct factual answer 1" },
-  { "question": "Question 2 text", "answer": "Direct factual answer 2" },
+  { "question": "Question text", "answer": "Direct factual answer" },
   ...
 ]
-Do not add explanations or extra text.
+Do not add explanations.
 `.trim();
+    }
 
     const aiText = await getAICompletion(prompt);
 

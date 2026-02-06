@@ -16,8 +16,11 @@ export async function GET(req: Request, context: any) {
     }
 
     const awards = await prisma.award.findMany({
-      where: { brfqId },
-      include: { winners: true, approvals: true },
+      where: { rfqId: brfqId },
+      include: {
+        // winners: true, 
+        // approvals: true 
+      },
     });
 
     return NextResponse.json({ success: true, data: awards }, { status: 200 });

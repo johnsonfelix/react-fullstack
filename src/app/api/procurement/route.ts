@@ -12,11 +12,12 @@ export async function GET() {
         description: true,
         requestType: true,
         category: true,
-        additionalFields:true,
+        additionalFields: true,
         address: true,
+        status: true,
         createdAt: true,
         updatedAt: true,
-        suppliers:true
+        suppliers: true
         // Include these if you want to display them in detail pages
         // scopeOfWork: true,
         // items: true,

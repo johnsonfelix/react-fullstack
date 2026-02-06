@@ -1,0 +1,24 @@
+
+> full-stack@0.1.0 build
+> next build
+
+   ▲ Next.js 15.3.1
+   - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 4.0s
+   Skipping linting
+   Checking validity of types ...
+Failed to compile.
+
+./src/app/api/questions/route.ts:11:7
+Type error: Object literal may only specify known properties, and 'quantity' does not exist in type '(Without<QuestionCreateInput, QuestionUncheckedCreateInput> & QuestionUncheckedCreateInput) | (Without<...> & QuestionCreateInput)'.
+
+[0m [90m  9 |[39m       type[33m:[39m body[33m.[39mtype [33m||[39m [32m"text"[39m[33m,[39m[0m
+[0m [90m 10 |[39m       required[33m:[39m body[33m.[39mrequired [33m||[39m [36mfalse[39m[33m,[39m[0m
+[0m[31m[1m>[22m[39m[90m 11 |[39m       quantity[33m:[39m body[33m.[39mquantity [33m||[39m [36mnull[39m[33m,[39m[0m
+[0m [90m    |[39m       [31m[1m^[22m[39m[0m
+[0m [90m 12 |[39m       uom[33m:[39m body[33m.[39muom [33m||[39m [36mnull[39m[33m,[39m[0m
+[0m [90m 13 |[39m       benchmark[33m:[39m body[33m.[39mbenchmark [33m||[39m [36mnull[39m[33m,[39m[0m
+[0m [90m 14 |[39m       deliverableId[33m:[39m body[33m.[39mdeliverableId[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null
