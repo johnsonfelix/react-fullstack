@@ -26,6 +26,7 @@ const menuGroups = [
       { href: '/administration/questionnaires', label: 'Questionnaires', icon: <ClipboardList size={18} /> },
       { href: '/administration/procurement-leads', label: 'Procurement Leads', icon: <Users size={18} /> },
       { href: '/administration/approvers', label: 'Approvers', icon: <UserCheck size={18} /> },
+      { href: '/administration/requests', label: 'Requests', icon: <FileText size={18} /> },
       { href: '/administration/rfq', label: 'Manage RFQ', icon: <FileText size={18} /> },
       { href: '/administration/rfq/workflow', label: 'RFQ Rules', icon: <Settings size={18} /> },
       { href: '/administration/approvers-flow', label: 'Workflow', icon: <GitMerge size={18} /> },

@@ -83,6 +83,13 @@ export default function BrfqDetail() {
     };
   }, [id]);
 
+  // Redirect if draft (User request: drafts should be editable, not read-only view)
+  useEffect(() => {
+    if (brfq && brfq.status === 'draft') {
+      router.replace(`/buyer/events/create?rfqId=${brfq.id}`);
+    }
+  }, [brfq, router]);
+
   // Fetch suppliers, categories, shipping after brfq loads
   useEffect(() => {
     if (!brfq) return;
@@ -294,8 +301,8 @@ export default function BrfqDetail() {
   // Determine awarded state and award details
   const isAwarded = Boolean(
     brfq &&
-      (String(brfq.status)?.toLowerCase() === 'awarded' ||
-        (brfq.award && ((Array.isArray(brfq.award.winners) && brfq.award.winners.length > 0) || brfq.award.winner)))
+    (String(brfq.status)?.toLowerCase() === 'awarded' ||
+      (brfq.award && ((Array.isArray(brfq.award.winners) && brfq.award.winners.length > 0) || brfq.award.winner)))
   );
 
   const getAwardWinners = (): string[] => {
@@ -500,7 +507,7 @@ export default function BrfqDetail() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              navigator.clipboard?.writeText(JSON.stringify(brfq)).catch(() => {});
+              navigator.clipboard?.writeText(JSON.stringify(brfq)).catch(() => { });
             }}
             className="flex items-center gap-1 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
             title="Copy data to clipboard (duplicate)"
@@ -521,9 +528,8 @@ export default function BrfqDetail() {
           <button
             onClick={() => setShowAwardModal(true)}
             disabled={isAwarded}
-            className={`flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium ${
-              isAwarded ? 'bg-gray-300 text-gray-700 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
+            className={`flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium ${isAwarded ? 'bg-gray-300 text-gray-700 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
             title={isAwarded ? 'Already awarded' : 'Award Recommendation'}
           >
             {isAwarded ? 'Awarded' : 'Award Recommendation'}
@@ -576,9 +582,8 @@ export default function BrfqDetail() {
             <p className="text-gray-500">Status</p>
             <p className="font-medium">
               <span
-                className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                  isPaused ? 'bg-yellow-500' : brfq.status === 'closed' || approvalStatus === 'closed' ? 'bg-green-500' : 'bg-blue-500'
-                }`}
+                className={`inline-block w-2 h-2 rounded-full mr-2 ${isPaused ? 'bg-yellow-500' : brfq.status === 'closed' || approvalStatus === 'closed' ? 'bg-green-500' : 'bg-blue-500'
+                  }`}
               />
               {(isPaused && 'PAUSED') || (String(approvalStatus).toUpperCase() ?? 'OPEN')}
             </p>
@@ -625,10 +630,10 @@ export default function BrfqDetail() {
                 <div className="flex flex-wrap gap-1">
                   {(brfq.customerCategory ?? brfq.categoryIds ?? []).length > 0
                     ? (brfq.customerCategory ?? brfq.categoryIds ?? []).map((cid: string) => (
-                        <span key={cid} className="px-2 py-1 bg-gray-100 rounded-md text-xs">
-                          {categoryNames[cid] ?? cid}
-                        </span>
-                      ))
+                      <span key={cid} className="px-2 py-1 bg-gray-100 rounded-md text-xs">
+                        {categoryNames[cid] ?? cid}
+                      </span>
+                    ))
                     : '—'}
                 </div>
               </div>

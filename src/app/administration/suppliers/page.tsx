@@ -228,10 +228,12 @@ export default function AdminSupplierList() {
                     {['approved', 'active'].includes((s.status || '').toLowerCase()) ? (
                       <Link href={`/administration/suppliers/${s.id}`} className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</Link>
                     ) : (
-                      <button onClick={() => handleApprove(s.id)} disabled={loadingMap[s.id]} className="text-sm px-3 py-1 bg-green-600 text-white rounded disabled:opacity-60">{loadingMap[s.id] ? '...' : 'Approve'}</button>
+                      <>
+                        <button onClick={() => handleApprove(s.id)} disabled={loadingMap[s.id]} className="text-sm px-3 py-1 bg-green-600 text-white rounded disabled:opacity-60">{loadingMap[s.id] ? '...' : 'Approve'}</button>
+                        <button onClick={() => openRejectModal(s.id)} className="text-sm px-3 py-1 bg-red-100 text-red-700 rounded">Reject</button>
+                        <button onClick={() => openRequestInfoModal(s.id)} className="text-sm px-3 py-1 bg-yellow-100 text-yellow-800 rounded">Request Info</button>
+                      </>
                     )}
-                    <button onClick={() => openRejectModal(s.id)} className="text-sm px-3 py-1 bg-red-100 text-red-700 rounded">Reject</button>
-                    <button onClick={() => openRequestInfoModal(s.id)} className="text-sm px-3 py-1 bg-yellow-100 text-yellow-800 rounded">Request Info</button>
                     <button onClick={() => handleDelete(s.id)} className="text-sm px-3 py-1 bg-red-600 text-white rounded">Delete</button>
                   </td>
                 </tr>

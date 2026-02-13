@@ -64,6 +64,7 @@ model Supplier {
   
   eventParticipations   EventParticipation[]
   rfpResponses          RfpResponse[]
+  catalogItems          CatalogItem[]
 
   // Metadata
   status                String    @default("pending") // pending, approved, rejected
@@ -72,6 +73,33 @@ model Supplier {
   submittedAt           DateTime?
   
   @@map("suppliers")
+}
+
+model CatalogItem {
+  id          String   @id @default(cuid())
+  itemType    String
+  description String
+  quantity    Int
+  price       Float
+  imageUrl    String?
+  supplierPartId String?
+
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  categoryId  String
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
+
+  uomId       String
+  uom         Uom      @relation(fields: [uomId], references: [id])
+
+  currencyId  String
+  currency    Currency @relation(fields: [currencyId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("catalog_items")
 }
 
 // Step 2: Contacts
@@ -191,6 +219,8 @@ model ProductCategory {
 
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+
+  catalogItems CatalogItem[]
 
   @@map("product_categories")
 }
@@ -334,6 +364,7 @@ model Currency {
   name      String
   createdAt DateTime     @default(now()) @map(name: "created_at")
   updatedAt DateTime     @updatedAt @map(name: "updated_at")
+  catalogItems CatalogItem[]
 }
 
 model Incoterms {
@@ -377,6 +408,7 @@ model Uom {
   name      String
   createdAt DateTime     @default(now()) @map(name: "created_at")
   updatedAt DateTime     @updatedAt @map(name: "updated_at")
+  catalogItems CatalogItem[]
 }
 
 model Urgency {
@@ -843,4 +875,22 @@ model RfpResponse {
   
   @@unique([supplierId, procurementRequestId, questionId]) // One answer per question per supplier
   @@map("rfp_responses")
+}
+
+
+model Request {
+  id             String    @id @default(cuid())
+  description    String
+  requestType    String
+  category       String
+  address        String?
+  estimatedValue String?
+  needByDate     String?   // storing as String for now to match draft state, or DateTime if we parse it
+  items          Json?
+  status         String    @default("PENDING")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  userId         String?   // Optional link to user
+
+  @@map("requests")
 }

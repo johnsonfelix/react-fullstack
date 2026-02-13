@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, CheckCircle, FileText } from "lucide-react";
+import { Send, Bot, User, Loader2, CheckCircle, FileText, Calendar, DollarSign, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils"; // Assuming a utils file exists for tailwind-merge, if not I'll use template literals or check for it.
-
-// Fallback for cn if not available, but usually it is in these projects. 
-// I'll assume standard shadcn/ui structure or similar based on package.json having clsx/tailwind-merge.
+import { cn } from "@/lib/utils";
+import CatalogSuggestions from "@/components/intake/CatalogSuggestions";
+import { useRouter } from "next/navigation";
 
 type Message = {
     role: "user" | "assistant";
@@ -18,9 +17,17 @@ type ProcurementDraft = {
     requestType?: "goods" | "service";
     category?: string;
     address?: string;
+    value?: string;
+    needByDate?: string;
     items?: any[];
     scopeOfWork?: string;
     [key: string]: any;
+};
+
+type Location = {
+    id: string;
+    name: string;
+    address: string;
 };
 
 export default function AIChatIntake() {
@@ -34,7 +41,20 @@ export default function AIChatIntake() {
     const [loading, setLoading] = useState(false);
     const [draft, setDraft] = useState<ProcurementDraft>({});
     const [isComplete, setIsComplete] = useState(false);
+    const [locations, setLocations] = useState<Location[]>([]);
+    const [suggestedItems, setSuggestedItems] = useState<any[]>([]);
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        fetch("/api/locations")
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) setLocations(data);
+            })
+            .catch(err => console.error("Failed to fetch locations", err));
+    }, []);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -67,7 +87,7 @@ export default function AIChatIntake() {
             const data = await res.json();
 
             if (data.updatedDraft) {
-                setDraft(data.updatedDraft);
+                setDraft(prev => ({ ...prev, ...data.updatedDraft }));
             }
 
             const aiMessage: Message = { role: "assistant", content: data.response };
@@ -87,10 +107,119 @@ export default function AIChatIntake() {
         }
     };
 
+    // Auto-search catalog when draft updates items or description
+    useEffect(() => {
+        const query = draft.description || (draft.items?.[0]?.name);
+        if (query && query.length > 3) {
+            const timeoutId = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/catalog/search?query=${encodeURIComponent(query)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setSuggestedItems(data.items || []);
+                    }
+                } catch (e) {
+                    console.error("Catalog search failed", e);
+                }
+            }, 1000); // Debounce
+            return () => clearTimeout(timeoutId);
+        }
+    }, [draft.description, draft.items]);
+
+    const handleSelectCatalogItem = (item: any) => {
+        // Add item to draft
+        const newItem = {
+            name: item.description,
+            quantity: 1,
+            unitPrice: item.price,
+            uom: item.uom?.name,
+            currency: item.currency?.name,
+            supplier: item.supplier?.companyName,
+            catalogItemId: item.id,
+            image: item.imageUrl,
+            price: item.price // Store explicit price for display
+        };
+
+        const currentItems = draft.items || [];
+
+        // Check for duplicates
+        const existingItemIndex = currentItems.findIndex(i => i.name === newItem.name);
+        if (existingItemIndex >= 0) {
+            setMessages(prev => [...prev, {
+                role: "assistant",
+                content: `"${newItem.name}" is already in your list. You can update the quantity in the draft panel.`
+            }]);
+            return;
+        }
+
+        setDraft(prev => ({
+            ...prev,
+            category: (prev.category && prev.category !== "Pending...") ? prev.category : (item.category?.name || "Pending..."),
+            items: [...currentItems, newItem]
+        }));
+
+        // Add system message
+        setMessages(prev => [...prev, {
+            role: "assistant",
+            content: `I've added "${item.description}" from ${item.supplier?.companyName} to your list.`
+        }]);
+    };
+
+    const updateItemQuantity = (index: number, quantity: number) => {
+        const newItems = [...(draft.items || [])];
+        if (quantity <= 0) {
+            // Optional: remove item if quantity is 0, or just keep it at 1
+            newItems.splice(index, 1);
+        } else {
+            newItems[index] = { ...newItems[index], quantity };
+        }
+        setDraft(prev => ({ ...prev, items: newItems }));
+    };
+
+
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             handleSend();
+        }
+    };
+
+    const updateDraftField = (field: keyof ProcurementDraft, value: string) => {
+        setDraft(prev => ({ ...prev, [field]: value }));
+    };
+
+    const router = useRouter();
+
+    const handleIntakeSubmit = async () => {
+        if (!draft.needByDate) {
+            setMessages(prev => [...prev, { role: 'assistant', content: 'Please provide a "Need By Date" before submitting.' }]);
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const res = await fetch('/api/requests', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(draft),
+            });
+
+            if (!res.ok) throw new Error('Failed to submit request');
+
+            // Clear draft and show success
+            setDraft({});
+            setMessages(prev => [...prev, { role: 'assistant', content: 'Your request has been submitted successfully! Redirecting you to the Requests page...' }]);
+            setIsComplete(false);
+
+            // Redirect to requests page
+            router.refresh();
+            router.push('/requests');
+
+        } catch (error) {
+            console.error('Submission error:', error);
+            setMessages(prev => [...prev, { role: 'assistant', content: 'Failed to submit request. Please try again.' }]);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -130,8 +259,8 @@ export default function AIChatIntake() {
                                 >
                                     <div
                                         className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${msg.role === "user"
-                                                ? "bg-blue-600 text-white rounded-br-none"
-                                                : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"
+                                            ? "bg-blue-600 text-white rounded-br-none"
+                                            : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"
                                             }`}
                                     >
                                         <div className="flex items-start gap-3">
@@ -162,6 +291,20 @@ export default function AIChatIntake() {
                         )}
                         <div ref={messagesEndRef} />
                     </div>
+
+                    {/* Catalog Suggestions Area */}
+                    <AnimatePresence>
+                        {suggestedItems.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="bg-white border-t border-gray-100 z-10"
+                            >
+                                <CatalogSuggestions items={suggestedItems} onSelect={handleSelectCatalogItem} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* Input Area */}
                     <div className="p-4 bg-white border-t border-gray-100">
@@ -199,7 +342,47 @@ export default function AIChatIntake() {
                         <DraftField label="Description" value={draft.description} />
                         <DraftField label="Type" value={draft.requestType} />
                         <DraftField label="Category" value={draft.category} />
-                        <DraftField label="Address" value={draft.address} />
+
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block flex items-center gap-1">
+                                <MapPin className="w-3 h-3" /> Address
+                            </label>
+                            <select
+                                className="w-full text-sm p-1 border rounded bg-gray-50 focus:ring-1 focus:ring-blue-500"
+                                value={draft.address || ""}
+                                onChange={(e) => updateDraftField('address', e.target.value)}
+                            >
+                                <option value="">Select Location</option>
+                                {locations.map(loc => (
+                                    <option key={loc.id} value={loc.name}>{loc.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block flex items-center gap-1">
+                                Est. Value
+                            </label>
+                            <input
+                                type="text"
+                                className="w-full text-sm p-1 border rounded bg-gray-50 focus:ring-1 focus:ring-blue-500"
+                                placeholder="0.00"
+                                value={draft.value || ""}
+                                onChange={(e) => updateDraftField('value', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block flex items-center gap-1">
+                                <Calendar className="w-3 h-3" /> Need By Date
+                            </label>
+                            <input
+                                type="date"
+                                className="w-full text-sm p-1 border rounded bg-gray-50 focus:ring-1 focus:ring-blue-500"
+                                value={draft.needByDate || ""}
+                                onChange={(e) => updateDraftField('needByDate', e.target.value)}
+                            />
+                        </div>
 
                         {draft.items && draft.items.length > 0 && (
                             <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
@@ -207,10 +390,30 @@ export default function AIChatIntake() {
                                     Items ({draft.items.length})
                                 </label>
                                 <ul className="space-y-2">
+
                                     {draft.items.map((item: any, i: number) => (
-                                        <li key={i} className="text-sm text-gray-700 flex justify-between border-b border-gray-100 last:border-0 pb-1 last:pb-0">
-                                            <span>{item.name || "Unnamed Item"}</span>
-                                            <span className="font-medium text-gray-900">x{item.quantity || 1}</span>
+                                        <li key={i} className="text-sm text-gray-700 flex justify-between items-center border-b border-gray-100 last:border-0 pb-1 last:pb-0">
+                                            <span className="flex-1 truncate pr-2">{item.name || "Unnamed Item"}</span>
+                                            <div className="flex items-center gap-1 bg-gray-100 rounded px-1">
+                                                <button
+                                                    className="w-5 h-5 flex items-center justify-center hover:bg-gray-200 rounded text-gray-600"
+                                                    onClick={() => updateItemQuantity(i, (item.quantity || 1) - 1)}
+                                                >
+                                                    -
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    className="w-8 text-center bg-transparent text-xs font-medium focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    value={item.quantity || 1}
+                                                    onChange={(e) => updateItemQuantity(i, parseInt(e.target.value) || 0)}
+                                                />
+                                                <button
+                                                    className="w-5 h-5 flex items-center justify-center hover:bg-gray-200 rounded text-gray-600"
+                                                    onClick={() => updateItemQuantity(i, (item.quantity || 1) + 1)}
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
@@ -221,11 +424,12 @@ export default function AIChatIntake() {
                             <motion.button
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="w-full mt-6 py-3 bg-green-600 text-white rounded-xl font-medium shadow-lg hover:bg-green-700 transition-all flex items-center justify-center gap-2"
-                                onClick={() => alert("Proceeding to submission... (Mock Action)")}
+                                className="w-full mt-6 py-3 bg-green-600 text-white rounded-xl font-medium shadow-lg hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={handleIntakeSubmit}
+                                disabled={isSubmitting}
                             >
-                                <CheckCircle className="w-5 h-5" />
-                                Submit Request
+                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                                {isSubmitting ? 'Submitting...' : 'Submit Request'}
                             </motion.button>
                         )}
                     </div>

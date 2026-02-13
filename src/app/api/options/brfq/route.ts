@@ -30,7 +30,7 @@ export async function GET() {
       shippingTypes,
       urgencies,
       uoms,
-      suppliers,
+      suppliers: suppliers.map(s => ({ ...s, name: s.companyName })),
       address,
       payment,
       serviceType,

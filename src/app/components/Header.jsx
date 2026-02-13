@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from "react";
-import { Plus, List, ChartArea, Settings, Users } from "lucide-react";
+import { Plus, List, ChartArea, Settings, Users, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import UserAccountnav from "./userAccountnav";
 import { useSession } from "next-auth/react";
@@ -18,6 +18,49 @@ export default function Header() {
 
   const session = useSession();
   const router = useRouter();
+
+  const userType = session?.data?.user?.type;
+
+  const getDashboardLink = () => {
+    if (!userType) return null;
+
+    const type = userType.toUpperCase();
+
+    if (type === 'SUPPLIER') {
+      return (
+        <Link
+          href="/supplier/dashboard"
+          className="flex items-center text-gray-700 hover:text-indigo-600 transition font-medium"
+        >
+          <LayoutDashboard className="w-5 h-5 mr-1" /> Dashboard
+        </Link>
+      );
+    }
+
+    if (type === 'APPROVER') {
+      return (
+        <Link
+          href="/approver-dashboard"
+          className="flex items-center text-gray-700 hover:text-indigo-600 transition font-medium"
+        >
+          <LayoutDashboard className="w-5 h-5 mr-1" /> Dashboard
+        </Link>
+      );
+    }
+
+    if (type === 'ADMIN') {
+      return (
+        <Link
+          href="/administration/address"
+          className="flex items-center text-gray-700 hover:text-indigo-600 transition font-medium"
+        >
+          <Settings className="w-5 h-5 mr-1" /> Administration
+        </Link>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <>
@@ -59,11 +102,13 @@ export default function Header() {
                 </Link>
 
                 <Link
-                  href="/administration/address"
+                  href="/requests"
                   className="flex items-center text-gray-700 hover:text-indigo-600 transition font-medium"
                 >
-                  <Settings className="w-5 h-5 mr-1" /> Administration
+                  <List className="w-5 h-5 mr-1" /> Requests
                 </Link>
+
+                {getDashboardLink()}
 
                 <button
                   onClick={() => router.push("/administration/supplier-invite")}

@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { FaBoxOpen, FaCheckCircle, FaClock, FaSpinner, FaExclamationCircle, FaTimesCircle, FaQuestionCircle } from "react-icons/fa";
 import Link from "next/link";
 
@@ -26,6 +27,7 @@ export default function SupplierDashboard() {
     const [error, setError] = useState<string | null>(null);
     const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
     const router = useRouter();
+    const { data: session } = useSession();
 
     const fetchRfps = async () => {
         try {
@@ -86,9 +88,18 @@ export default function SupplierDashboard() {
         <div className="p-8 font-sans">
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Supplier Portal</h1>
+                    <h1 className="text-3xl font-bold text-gray-900">
+                        {session?.user ? `Welcome, ${session.user.username || session.user.email?.split('@')[0]}` : "Supplier Portal"}
+                    </h1>
                     <p className="text-gray-500 mt-1">Manage your invitations and submit responses.</p>
                 </div>
+                <Link
+                    href="/supplier/dashboard/catalog"
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm"
+                >
+                    <FaBoxOpen className="text-lg" />
+                    <span className="font-medium">Manage Catalog</span>
+                </Link>
             </div>
 
             {error && (

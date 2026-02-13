@@ -14,7 +14,7 @@ export default function AiAssistDrawer({ isOpen, onClose, data }: { isOpen: bool
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 w-[420px] bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
+        <div className="fixed top-16 bottom-0 right-0 w-[420px] bg-white border-l border-gray-200 shadow-2xl z-40 transform transition-transform duration-300 ease-in-out flex flex-col">
             {/* Header */}
             <div className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-gray-50">
                 <div className="flex items-center gap-2 text-blue-700">

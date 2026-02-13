@@ -7,14 +7,14 @@ export async function POST(req: NextRequest) {
     const { messages, currentDraft } = await req.json();
 
     const systemPrompt = `
-You are an expert procurement assistant. Your goal is to help the user define a procurement request.
-You need to gather the following information to complete the "procurementDraft" object:
-1. description: Detailed description of what is needed.
-2. requestType: "goods" or "service".
-3. category: A short category string (e.g., "IT Equipment", "Consulting").
-4. address: Delivery or service address.
-5. items: An array of items (if goods) or deliverables (if service). Each item should have a name and quantity.
-6. scopeOfWork: (Only if requestType is service) A description of the scope.
+You are an AI Procurement Assistant. Your goal is to help the user define their procurement request.
+You need to gather the following information:
+1. Description of the need
+2. Type of request (goods or service)
+3. Category (e.g., IT, Office Supplies, Marketing)
+4. Delivery Address (City/Location)
+5. Estimated Value (Budget/Cost) - Look for patterns like "$5000", "5k budget", "around 10000 dollars"
+6. Need By Date (Deadline) - Look for patterns like "by next friday", "before Dec 31st", "in 2 weeks"
 
 Current Draft State:
 ${JSON.stringify(currentDraft, null, 2)}
@@ -24,8 +24,10 @@ ${messages.map((m: any) => `${m.role}: ${m.content}`).join("\n")}
 
 Instructions:
 - Analyze the user's latest message and the history.
-- Extract any new information relevant to the fields above and update the draft.
-- If the user hasn't provided a piece of information, ask for it politely.
+- **CRITICAL**: Check the "Current Draft State". If a field (especially "address") is already populated, DO NOT ask for it again unless the user explicitly wants to change it.
+- **Item Extraction**: If the user mentions items (e.g., "10 pencils and 5 pens"), extract them into the \`items\` array with \`name\` and \`quantity\`.
+    - Example: "I need 10 pencils" -> items: [{ "name": "pencils", "quantity": 10 }]
+    - Example: "5 laptops" -> items: [{ "name": "laptops", "quantity": 5 }]
 - If the user is unsure, offer suggestions based on the context.
 - Prioritize getting the "description" and "requestType" first if missing.
 - Once you have enough information (at least description, requestType, category, and address), you can consider the intake complete, but ask if they want to add anything else first.
@@ -35,7 +37,15 @@ Output Format:
 You must output ONLY a valid JSON object with no markdown formatting.
 {
   "response": "Your response to the user here.",
-  "updatedDraft": { ... }, // The fully updated draft object
+  "updatedDraft": {
+    "description": "...",
+    "requestType": "goods" | "service",
+    "category": "...",
+    "address": "...",
+    "value": "1000",
+    "needByDate": "YYYY-MM-DD",
+    "items": []
+  },
   "isComplete": boolean // true if the intake is finished
 }
 `;
@@ -55,7 +65,7 @@ You must output ONLY a valid JSON object with no markdown formatting.
     const response = await bedrockClient.send(command);
     const rawBody = new TextDecoder().decode(response.body);
     const parsed = JSON.parse(rawBody);
-    
+
     let textContent = parsed.content
       ?.filter((block: any) => block.type === "text")
       .map((block: any) => block.text)

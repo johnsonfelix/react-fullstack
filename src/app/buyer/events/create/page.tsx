@@ -224,36 +224,36 @@ const RFQForm: React.FC = () => {
       // draft.items could be: ["line1", "line2"] or [{description: '...'}, {...}] or richer objects
       const mappedItems: FormItem[] = Array.isArray(draft.items)
         ? draft.items.map((it: any, idx: number) => {
-            if (typeof it === "string") {
-              return {
-                lineNo: idx + 1,
-                lineType: (options.serviceType && options.serviceType[0]?.name) || "Goods",
-                itemNumber: "",
-                itemDescription: it,
-                brandManufacturer: "",
-                origin: "",
-                estQuantity: 1,
-                uom: "",
-                currentPrice: "",
-                targetPrice: "",
-                prValue: "",
-              };
-            }
-            // object case: try to extract common fields
+          if (typeof it === "string") {
             return {
               lineNo: idx + 1,
-              lineType: it.lineType ?? it.type ?? (options.serviceType && options.serviceType[0]?.name),
-              itemNumber: it.itemNumber ?? it.partNo ?? it.item_number ?? "",
-              itemDescription: it.description ?? it.itemDescription ?? it.item_description ?? it.name ?? "",
-              brandManufacturer: it.brand ?? it.manufacturer ?? it.brandManufacturer ?? "",
-              origin: it.origin ?? "",
-              estQuantity: typeof it.quantity !== "undefined" ? Number(it.quantity) : (it.estQuantity ?? 1),
-              uom: it.uom ?? "",
-              currentPrice: typeof it.currentPrice !== "undefined" ? Number(it.currentPrice) : (it.current_price ?? ""),
-              targetPrice: typeof it.targetPrice !== "undefined" ? Number(it.targetPrice) : (it.target_price ?? ""),
-              prValue: typeof it.prValue !== "undefined" ? Number(it.prValue) : (it.pr_value ?? ""),
+              lineType: (options.serviceType && options.serviceType[0]?.name) || "Goods",
+              itemNumber: "",
+              itemDescription: it,
+              brandManufacturer: "",
+              origin: "",
+              estQuantity: 1,
+              uom: "",
+              currentPrice: "",
+              targetPrice: "",
+              prValue: "",
             };
-          })
+          }
+          // object case: try to extract common fields
+          return {
+            lineNo: idx + 1,
+            lineType: it.lineType ?? it.type ?? (options.serviceType && options.serviceType[0]?.name),
+            itemNumber: it.itemNumber ?? it.partNo ?? it.item_number ?? "",
+            itemDescription: it.description ?? it.itemDescription ?? it.item_description ?? it.name ?? "",
+            brandManufacturer: it.brand ?? it.manufacturer ?? it.brandManufacturer ?? "",
+            origin: it.origin ?? "",
+            estQuantity: typeof it.quantity !== "undefined" ? Number(it.quantity) : (it.estQuantity ?? 1),
+            uom: it.uom ?? "",
+            currentPrice: typeof it.currentPrice !== "undefined" ? Number(it.currentPrice) : (it.current_price ?? ""),
+            targetPrice: typeof it.targetPrice !== "undefined" ? Number(it.targetPrice) : (it.target_price ?? ""),
+            prValue: typeof it.prValue !== "undefined" ? Number(it.prValue) : (it.pr_value ?? ""),
+          };
+        })
         : [];
 
       // Prepare newFormData but keep existing defaults for fields user might want to supply manually later
@@ -354,22 +354,22 @@ const RFQForm: React.FC = () => {
 
         const mappedItems = Array.isArray(payload.items)
           ? payload.items.map((it: any, idx: number) => ({
-              lineNo: idx + 1,
-              lineType: it.lineType ?? it.serviceType ?? "Goods",
-              itemNumber: it.internalPartNo ?? it.itemNumber ?? "",
-              itemDescription: it.description ?? it.itemDescription ?? "",
-              brandManufacturer: it.manufacturer ?? it.brandManufacturer ?? "",
-              origin: it.origin ?? "",
-              estQuantity: typeof it.quantity !== "undefined" ? Number(it.quantity) : it.estQuantity ?? 0,
-              uom: it.uom ?? "",
-              currentPrice: it.currentPrice ?? it.current_price ?? 0,
-              targetPrice: it.targetPrice ?? it.target_price ?? 0,
-              prValue: it.prValue ?? it.pr_value ?? 0,
-            }))
+            lineNo: idx + 1,
+            lineType: it.lineType ?? it.serviceType ?? "Goods",
+            itemNumber: it.internalPartNo ?? it.itemNumber ?? "",
+            itemDescription: it.description ?? it.itemDescription ?? "",
+            brandManufacturer: it.manufacturer ?? it.brandManufacturer ?? "",
+            origin: it.origin ?? "",
+            estQuantity: typeof it.quantity !== "undefined" ? Number(it.quantity) : it.estQuantity ?? 0,
+            uom: it.uom ?? "",
+            currentPrice: it.currentPrice ?? it.current_price ?? 0,
+            targetPrice: it.targetPrice ?? it.target_price ?? 0,
+            prValue: it.prValue ?? it.pr_value ?? 0,
+          }))
           : [];
 
         const suppliersSelectedNormalized = Array.isArray(payload.suppliersSelected)
-          ? payload.suppliersSelected.map((s: any) => (typeof s === "string" ? { id: s, email: "" } : { id: s.id ?? s, email: s.email ?? "" }))
+          ? payload.suppliersSelected.map((s: any) => (typeof s === "string" ? { id: s, name: s, email: "" } : { id: s.id ?? s, name: s.name || s.name, email: s.email ?? "" }))
           : [];
 
         let attachments: string[] = [];
@@ -445,10 +445,26 @@ const RFQForm: React.FC = () => {
         } else {
           if (Array.isArray(suppliersSelectedNormalized) && suppliersSelectedNormalized.length > 0) {
             setSelectedCategories((prev) => {
-              if (!prev.find((c) => c.id === "manual")) {
-                return [...prev, { id: "manual", name: "Selected Suppliers", suppliers: suppliersSelectedNormalized.map((s) => ({ id: s.id, name: s.id, user: { email: s.email || "" } })) }];
+              const manualGroup = {
+                id: "manual",
+                name: "Selected Suppliers",
+                suppliers: suppliersSelectedNormalized.map((s) => {
+                  const fromOptions = (options.suppliers || []).find((opt: any) => opt.id === s.id);
+                  return {
+                    id: s.id,
+                    name: s.name && s.name !== s.id ? s.name : (fromOptions?.companyName || fromOptions?.name || s.id),
+                    user: { email: s.email || "" }
+                  };
+                })
+              };
+
+              const existingIdx = prev.findIndex((c) => c.id === "manual");
+              if (existingIdx >= 0) {
+                const copy = [...prev];
+                copy[existingIdx] = manualGroup;
+                return copy;
               }
-              return prev;
+              return [...prev, manualGroup];
             });
             setSelectedSuppliersMap((prev) => ({ ...prev, manual: suppliersSelectedNormalized.map((s) => s.id) }));
           }
@@ -458,7 +474,123 @@ const RFQForm: React.FC = () => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [options.serviceType, options.suppliers]);
+
+
+  // -----------------------
+  // Load data from Request if ?requestId= is present
+  // -----------------------
+  useEffect(() => {
+    const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const requestId = q?.get("requestId");
+    if (!requestId) return;
+
+    (async () => {
+      try {
+        const res = await axios.get(`/api/requests/${encodeURIComponent(requestId)}`);
+        const request = res.data;
+        if (!request) return;
+
+        const defaultType = (options.serviceType && options.serviceType[0]?.name) || "Goods";
+
+        const mappedItems = Array.isArray(request.items)
+          ? request.items.map((it: any, idx: number) => ({
+            lineNo: idx + 1,
+            lineType: defaultType,
+            itemNumber: "",
+            itemDescription: it.name || it.description || "",
+            brandManufacturer: "",
+            origin: "",
+            estQuantity: Number(it.quantity || 1),
+            uom: it.uom || "EA",
+            currentPrice: Number(it.price || it.unitPrice || 0),
+            targetPrice: Number(it.price || it.unitPrice || 0),
+            prValue: (Number(it.price || 0) * Number(it.quantity || 1)) || 0,
+          }))
+          : [];
+
+        // Find category by name
+        let catIds: string[] = [];
+        let cats: CategoryWithSuppliers[] = [];
+
+        // Handle Category
+        if (request.category && options.customerCategory) {
+          const foundCat = options.customerCategory.find((c: any) => c.name === request.category);
+          if (foundCat) {
+            catIds = [foundCat.id];
+            // We don't overwrite cats here immediately to avoid wiping out suppliers we might find
+            // But we can initialize the category structure
+            cats = [{ id: foundCat.id, name: foundCat.name, suppliers: [] }];
+          }
+        }
+
+        // Handle Suppliers from Items
+        const suppliersFromItems: any[] = [];
+        if (request.items && options.suppliers) {
+          const uniqueSupplierIds = new Set<string>();
+          const uniqueSupplierNames = new Set<string>();
+
+          request.items.forEach((it: any) => {
+            if (it.supplierId) uniqueSupplierIds.add(it.supplierId);
+            else if (it.supplier) uniqueSupplierNames.add(it.supplier);
+          });
+
+          // Find by ID first (more reliable)
+          uniqueSupplierIds.forEach(id => {
+            const found = options.suppliers.find((s: any) => s.id === id);
+            if (found) suppliersFromItems.push(found);
+          });
+
+          // Fallback to name match
+          uniqueSupplierNames.forEach(name => {
+            // Avoid adding if already added by ID
+            const alreadyAdded = suppliersFromItems.some(s => s.name === name || s.companyName === name);
+            if (!alreadyAdded) {
+              const found = options.suppliers.find((s: any) =>
+                s.name === name || s.companyName === name || s.company === name
+              );
+              if (found) suppliersFromItems.push(found);
+            }
+          });
+        }
+
+        setFormData((prev: any) => ({
+          ...prev,
+          title: request.description || prev.title,
+          // requesterReference: request.id, // User requested to not populate this
+          requesterReference: "",
+          shippingAddress: request.address || prev.shippingAddress,
+          currency: (request.items && request.items[0]?.currency) || prev.currency,
+          items: mappedItems.length ? mappedItems : prev.items,
+          status: "draft",
+          needByDate: request.needByDate ? new Date(request.needByDate).toISOString().slice(0, 10) : prev.needByDate,
+          categoryIds: catIds.length ? catIds : prev.categoryIds
+        }));
+
+        if (suppliersFromItems.length > 0) {
+          // If we have a category, add suppliers to that category
+          if (cats.length > 0) {
+            cats[0].suppliers = suppliersFromItems;
+            setSelectedCategories(cats);
+            const map = { [cats[0].id]: suppliersFromItems.map(s => s.id) };
+            setSelectedSuppliersMap(map);
+          } else {
+            // No category matched, add to "manual" / "Selected Suppliers"
+            const manualGroup = { id: "manual", name: "Selected Suppliers", suppliers: suppliersFromItems };
+            setSelectedCategories([manualGroup]);
+            const map = { "manual": suppliersFromItems.map(s => s.id) };
+            setSelectedSuppliersMap(map);
+          }
+        } else if (cats.length > 0) {
+          // Only category found, no specific suppliers from items
+          setSelectedCategories(cats);
+        }
+
+      } catch (err) {
+        console.error("Failed to load request data", err);
+      }
+    })();
+  }, [options.serviceType, options.customerCategory, options.suppliers]);
 
   // Keep suppliersSelected in sync with selectedSuppliersMap + selectedCategories
   useEffect(() => {

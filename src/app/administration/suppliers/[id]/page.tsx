@@ -176,11 +176,17 @@ export default function EditSupplierPage({ params }: { params: Promise<{ id: str
                                 className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
                             >
                                 <option value="">Select...</option>
-                                <option value="Manufacturer">Manufacturer</option>
-                                <option value="Distributor">Distributor</option>
-                                <option value="Service Provider">Service Provider</option>
-                                <option value="Wholesaler">Wholesaler</option>
-                                <option value="Retailer">Retailer</option>
+                                <option value="SME">SME</option>
+                                <option value="Government">Government</option>
+                                <option value="Semi-Government ">Semi-Government</option>
+                                <option value="Private">Private</option>
+                                <option value="Minority-Owned Business">Minority-Owned Business</option>
+                                <option value="Startup / Early-Stage Company">Startup / Early-Stage Company</option>
+                                <option value="Social Enterprise">Social Enterprise</option>
+                                <option value="Disability-Owned Business">Disability-Owned Business</option>
+                                <option value="Veteran-Owned Business">Veteran-Owned Business</option>
+                                <option value="Family-Owned Business">Family-Owned Business</option>
+                                <option value="Sole Proprietorship">Sole Proprietorship</option>
                             </select>
                         </div>
                     </div>
