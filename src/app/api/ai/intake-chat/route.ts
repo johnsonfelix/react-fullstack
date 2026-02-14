@@ -46,6 +46,7 @@ You must output ONLY a valid JSON object with no markdown formatting.
     "needByDate": "YYYY-MM-DD",
     "items": []
   },
+  "searchKeywords": "pencil", // Optional: Minimal keyword for catalog search (e.g. "pencils" -> "pencil")
   "isComplete": boolean // true if the intake is finished
 }
 `;

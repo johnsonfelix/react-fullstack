@@ -42,8 +42,8 @@ export default function CatalogSuggestions({ items, onSelect }: CatalogSuggestio
     if (items.length === 0) return null;
 
     return (
-        <div className="mt-4 space-y-3">
-            <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+        <div className="mt-2">
+            <div className="flex gap-3 overflow-x-auto pb-4 pt-1 px-1 snap-x scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {items.map((item) => {
                     const isSME = item.supplier?.supplierType === "SME";
                     const isExpanded = expandedIds.has(item.id);
@@ -52,7 +52,7 @@ export default function CatalogSuggestions({ items, onSelect }: CatalogSuggestio
                         <div
                             key={item.id}
                             className={cn(
-                                "relative flex flex-col bg-white rounded-lg border transition-all duration-200 overflow-visible group",
+                                "relative flex flex-col bg-white rounded-lg border transition-all duration-200 overflow-visible group w-[280px] min-w-[280px] flex-shrink-0 snap-center",
                                 isSME ? "border-emerald-500/30 shadow-sm" : "border-gray-100 shadow-sm hover:border-blue-200"
                             )}
                         >

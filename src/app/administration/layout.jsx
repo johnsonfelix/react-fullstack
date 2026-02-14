@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   MapPin, Layers, Truck, Users, Folder,
   DollarSign, Weight, CreditCard, Ship,
-  Settings, Box, FileText, ClipboardList, UserCheck, GitMerge
+  Settings, Box, FileText, ClipboardList, UserCheck, GitMerge, BookOpen
 } from 'lucide-react';
 
 // Grouped links for better organization
@@ -18,6 +18,7 @@ const menuGroups = [
       { href: '/administration/suppliers', label: 'Suppliers', icon: <Truck size={18} /> },
       { href: '/administration/supplier-invite', label: 'Supplier Invites', icon: <Users size={18} /> },
       { href: '/administration/projects', label: 'Projects', icon: <Folder size={18} /> },
+      { href: '/administration/catalogues', label: 'Catalogues', icon: <BookOpen size={18} /> },
     ]
   },
   {

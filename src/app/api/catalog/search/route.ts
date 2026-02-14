@@ -13,10 +13,14 @@ export async function GET(req: Request) {
             return NextResponse.json({ items: [] });
         }
 
+        // Simple singularization: if query ends in 's', try searching without it
+        const singularQuery = query.toLowerCase().endsWith('s') ? query.slice(0, -1) : query;
+
         const items = await prisma.catalogItem.findMany({
             where: {
                 OR: [
                     { description: { contains: query, mode: "insensitive" } },
+                    { description: { contains: singularQuery, mode: "insensitive" } }, // Check singular
                     { itemType: { contains: query, mode: "insensitive" } },
                     { category: { name: { contains: query, mode: "insensitive" } } }
                 ]
@@ -32,7 +36,7 @@ export async function GET(req: Request) {
                 uom: true,
                 category: true
             },
-            take: 5
+            take: 50
         });
 
         return NextResponse.json({ items });

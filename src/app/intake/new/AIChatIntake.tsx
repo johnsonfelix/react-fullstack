@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, CheckCircle, FileText, Calendar, DollarSign, MapPin } from "lucide-react";
+import { Send, Bot, User, Loader2, CheckCircle, FileText, Calendar, DollarSign, MapPin, Package } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import CatalogSuggestions from "@/components/intake/CatalogSuggestions";
@@ -10,6 +10,9 @@ import { useRouter } from "next/navigation";
 type Message = {
     role: "user" | "assistant";
     content: string;
+    suggestions?: any[];
+    hiddenContent?: string;
+    interactionMode?: 'options';
 };
 
 type ProcurementDraft = {
@@ -42,7 +45,8 @@ export default function AIChatIntake() {
     const [draft, setDraft] = useState<ProcurementDraft>({});
     const [isComplete, setIsComplete] = useState(false);
     const [locations, setLocations] = useState<Location[]>([]);
-    const [suggestedItems, setSuggestedItems] = useState<any[]>([]);
+    const [shownQueries, setShownQueries] = useState<Set<string>>(new Set());
+    const [isSelectionDone, setIsSelectionDone] = useState(false);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -61,15 +65,13 @@ export default function AIChatIntake() {
     };
 
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+        const timeoutId = setTimeout(() => {
+            scrollToBottom();
+        }, 100); // Small delay to allow for rendering updates
+        return () => clearTimeout(timeoutId);
+    }, [messages, loading]); // Added loading to dependency to scroll when loading indicator appears/disappears
 
-    const handleSend = async () => {
-        if (!input.trim() || loading) return;
-
-        const userMessage: Message = { role: "user", content: input };
-        setMessages((prev) => [...prev, userMessage]);
-        setInput("");
+    const generateAIResponse = async (currentMessages: Message[]) => {
         setLoading(true);
 
         try {
@@ -77,7 +79,7 @@ export default function AIChatIntake() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    messages: [...messages, userMessage],
+                    messages: currentMessages,
                     currentDraft: draft,
                 }),
             });
@@ -91,6 +93,64 @@ export default function AIChatIntake() {
             }
 
             const aiMessage: Message = { role: "assistant", content: data.response };
+
+            // Check if user just proceeded - if so, forcefully suppress new suggestions to prevent loops
+            const lastUserMsg = currentMessages[currentMessages.length - 1];
+            const isProceedAction = lastUserMsg?.role === 'user' && lastUserMsg?.content === 'Proceed with selection';
+
+            // If AI provided specific search keywords, use them (UNLESS user just proceeded or we are done with selection)
+            if (data.searchKeywords && !isProceedAction && !isSelectionDone) {
+                const normalizedKeyword = data.searchKeywords.toLowerCase().trim();
+                console.log("AI suggested search keywords:", data.searchKeywords);
+
+                // Smart Check: If we already have items that match this keyword, DON'T search again.
+                // This assumes the user is asking for more details about the *existing* item, not a new one.
+                const currentItems = data.updatedDraft?.items || draft.items || [];
+                const hasMatchingItem = currentItems.some((item: any) =>
+                    item.name?.toLowerCase().includes(normalizedKeyword)
+                );
+
+                if (hasMatchingItem) {
+                    console.log(`Keyword "${normalizedKeyword}" matches existing item. Suppressing search to avoid loops.`);
+                } else if (!shownQueries.has(normalizedKeyword)) {
+                    // Trigger an immediate search with these keywords
+                    try {
+                        const searchRes = await fetch(`/api/catalog/search?query=${encodeURIComponent(data.searchKeywords)}`);
+                        if (searchRes.ok) {
+                            const searchData = await searchRes.json();
+                            if (searchData.items && searchData.items.length > 0) {
+
+                                // Calculate current items based on draft and any updates from this response
+                                // const currentItems = data.updatedDraft?.items || draft.items || []; // Already defined above
+                                const existingIds = new Set(currentItems.map((i: any) => i.catalogItemId || i.id));
+
+                                const filteredSuggestions = searchData.items.filter((item: any) => !existingIds.has(item.id));
+
+                                if (filteredSuggestions.length > 0) {
+                                    aiMessage.suggestions = filteredSuggestions;
+                                    // Hide the AI text content and show suggestions + options
+                                    aiMessage.hiddenContent = aiMessage.content;
+                                    aiMessage.content = ""; // Clear visible content
+                                    aiMessage.interactionMode = 'options';
+
+                                    setShownQueries(prev => {
+                                        const next = new Set(prev);
+                                        next.add(normalizedKeyword);
+                                        return next;
+                                    });
+                                } else {
+                                    console.log("Skipping suggestions as all items are already in draft.");
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("AI keyword search failed", e);
+                    }
+                } else {
+                    console.log("Skipping duplicate suggestion for keyword:", normalizedKeyword);
+                }
+            }
+
             setMessages((prev) => [...prev, aiMessage]);
 
             if (data.isComplete) {
@@ -107,16 +167,84 @@ export default function AIChatIntake() {
         }
     };
 
+    const handleSend = async () => {
+        if (!input.trim() || loading) return;
+
+        // Reset selection done state if user types manually (starting new context?)
+        setIsSelectionDone(false);
+
+        const userMessage: Message = { role: "user", content: input };
+        const newMessages = [...messages, userMessage];
+        setMessages(newMessages);
+        setInput("");
+
+        await generateAIResponse(newMessages);
+    };
+
     // Auto-search catalog when draft updates items or description
     useEffect(() => {
-        const query = draft.description || (draft.items?.[0]?.name);
-        if (query && query.length > 3) {
+        if (loading) return; // Don't auto-search if AI is currently processing (it handles its own search)
+
+        // STRICT BLOCK: If selection is done, DO NOT SEARCH via effect
+        if (isSelectionDone) return;
+
+        // STRICT BLOCK: If we already have items, assume the "discovery" phase is over. 
+        // Only AI-driven specific searches allowed from now on.
+        if (draft.items && draft.items.length > 0) return;
+
+        // Extract keywords for better search
+        // remove draft.items check to avoid loop (searching for item we just added)
+        let query = draft.description || "";
+
+        // Simple heuristic: if query is long, take the first 3 words or try to clean it
+        if (query.length > 20) {
+            query = query.split(' ').slice(0, 3).join(' ');
+        }
+
+        const normalizedQuery = query.toLowerCase().trim();
+
+        if (query && query.length > 3 && !shownQueries.has(normalizedQuery)) {
             const timeoutId = setTimeout(async () => {
                 try {
+                    // Check again inside timeout in case it changed
+                    if (shownQueries.has(normalizedQuery)) return;
+                    if (isSelectionDone) return; // Check again inside timeout
+
+                    console.log("Searching catalog for:", query);
                     const res = await fetch(`/api/catalog/search?query=${encodeURIComponent(query)}`);
                     if (res.ok) {
                         const data = await res.json();
-                        setSuggestedItems(data.items || []);
+                        if (data.items && data.items.length > 0) {
+
+                            // Filter out items that are already in the draft
+                            const existingIds = new Set(draft.items?.map(i => i.catalogItemId || i.id) || []);
+                            const filteredItems = data.items.filter((item: any) => !existingIds.has(item.id));
+
+                            if (filteredItems.length === 0) {
+                                console.log("All found items are already in draft, skipping suggestions.");
+                                return;
+                            }
+
+                            setShownQueries(prev => {
+                                const next = new Set(prev);
+                                next.add(normalizedQuery);
+                                return next;
+                            });
+
+                            // Check if the last message already has suggestions to avoid duplicate spam
+                            setMessages(prev => {
+                                const lastMsg = prev[prev.length - 1];
+
+                                // if last message already has suggestions, don't just append blindly? 
+                                // But maybe the user wants options.
+
+                                return [...prev, {
+                                    role: 'assistant',
+                                    content: '',
+                                    suggestions: filteredItems
+                                }];
+                            });
+                        }
                     }
                 } catch (e) {
                     console.error("Catalog search failed", e);
@@ -124,7 +252,30 @@ export default function AIChatIntake() {
             }, 1000); // Debounce
             return () => clearTimeout(timeoutId);
         }
-    }, [draft.description, draft.items]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draft.description, draft.items, isSelectionDone]);
+
+    const handleInteraction = (index: number, action: 'proceed' | 'manual') => {
+        let updatedMessages = [...messages];
+
+        // Update the target message
+        updatedMessages[index] = {
+            ...updatedMessages[index],
+            content: updatedMessages[index].hiddenContent || updatedMessages[index].content,
+            interactionMode: undefined,
+            suggestions: action === 'manual' ? undefined : updatedMessages[index].suggestions
+        };
+
+        if (action === 'proceed') {
+            setIsSelectionDone(true); // MARK SELECTION AS DONE
+            const userMsg: Message = { role: 'user', content: 'Proceed with selection' };
+            updatedMessages.push(userMsg);
+            setMessages(updatedMessages);
+            generateAIResponse(updatedMessages);
+        } else {
+            setMessages(updatedMessages);
+        }
+    };
 
     const handleSelectCatalogItem = (item: any) => {
         // Add item to draft
@@ -224,16 +375,16 @@ export default function AIChatIntake() {
     };
 
     return (
-        <div className="flex flex-col h-[85vh] max-w-5xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+        <div className="flex flex-col h-[calc(100vh-theme(spacing.20))] w-full bg-white overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white flex items-center justify-between shadow-md z-10">
+            <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm z-10 h-16 shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
-                        <Bot className="w-6 h-6 text-white" />
+                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <Bot className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold tracking-tight">AI Intake Assistant</h1>
-                        <p className="text-blue-100 text-sm">Describe your needs, I'll handle the rest.</p>
+                        <h1 className="text-lg font-bold text-gray-900 tracking-tight leading-none">AI Intake Assistant</h1>
+                        <p className="text-gray-500 text-xs mt-0.5">Describe your needs, I'll handle the rest.</p>
                     </div>
                 </div>
                 {isComplete && (
@@ -246,88 +397,122 @@ export default function AIChatIntake() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Chat Area */}
-                <div className="flex-1 flex flex-col relative bg-gray-50/50">
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth">
-                        <AnimatePresence initial={false}>
-                            {messages.map((msg, idx) => (
-                                <motion.div
-                                    key={idx}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                                >
-                                    <div
-                                        className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${msg.role === "user"
-                                            ? "bg-blue-600 text-white rounded-br-none"
-                                            : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"
-                                            }`}
+                {/* Chat Area */}
+                <div className="flex-1 flex flex-col relative bg-gray-50">
+                    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth">
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            <AnimatePresence initial={false}>
+                                {messages.map((msg, idx) => (
+                                    <motion.div
+                                        key={idx}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
                                     >
-                                        <div className="flex items-start gap-3">
-                                            {msg.role === "assistant" && <Bot className="w-5 h-5 mt-1 text-blue-600 shrink-0" />}
-                                            <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
-                                            {msg.role === "user" && <User className="w-5 h-5 mt-1 text-blue-200 shrink-0" />}
+                                        {msg.content && (
+                                            <div
+                                                className={`max-w-[85%] p-4 rounded-2xl shadow-sm mb-2 ${msg.role === "user"
+                                                    ? "bg-blue-600 text-white rounded-br-none"
+                                                    : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"
+                                                    }`}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    {msg.role === "assistant" && <Bot className="w-5 h-5 mt-1 text-blue-600 shrink-0" />}
+                                                    <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                                                    {msg.role === "user" && <User className="w-5 h-5 mt-1 text-blue-200 shrink-0" />}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {msg.suggestions && msg.suggestions.length > 0 && (
+                                            <div className="w-full max-w-full overflow-hidden mb-4 pl-2">
+                                                <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+                                                    <Package className="w-3 h-3" /> Suggested Items
+                                                </div>
+                                                <CatalogSuggestions items={msg.suggestions} onSelect={handleSelectCatalogItem} />
+
+                                                {msg.interactionMode === 'options' && (
+                                                    <div className="mt-3 flex justify-center gap-3">
+                                                        {(() => {
+                                                            const hasSelectedSuggestion = msg.suggestions?.some((s: any) =>
+                                                                draft.items?.some((i: any) => i.catalogItemId === s.id)
+                                                            );
+
+                                                            return (
+                                                                <button
+                                                                    onClick={() => handleInteraction(idx, 'proceed')}
+                                                                    disabled={!hasSelectedSuggestion}
+                                                                    title={!hasSelectedSuggestion ? "Please select an item first" : ""}
+                                                                    className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors shadow-sm ${hasSelectedSuggestion
+                                                                            ? "bg-blue-600 hover:bg-blue-700"
+                                                                            : "bg-gray-400 cursor-not-allowed opacity-70"
+                                                                        }`}
+                                                                >
+                                                                    Proceed with Selection
+                                                                </button>
+                                                            );
+                                                        })()}
+                                                        <button
+                                                            onClick={() => handleInteraction(idx, 'manual')}
+                                                            className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm"
+                                                        >
+                                                            Enter Manually
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+
+                            {loading && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="flex justify-start"
+                                >
+                                    <div className="bg-white p-4 rounded-2xl rounded-bl-none border border-gray-200 shadow-sm flex items-center gap-3">
+                                        <Bot className="w-5 h-5 text-blue-600" />
+                                        <div className="flex gap-1">
+                                            <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                            <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                            <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                                         </div>
                                     </div>
                                 </motion.div>
-                            ))}
-                        </AnimatePresence>
-
-                        {loading && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="flex justify-start"
-                            >
-                                <div className="bg-white p-4 rounded-2xl rounded-bl-none border border-gray-200 shadow-sm flex items-center gap-3">
-                                    <Bot className="w-5 h-5 text-blue-600" />
-                                    <div className="flex gap-1">
-                                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                        <div ref={messagesEndRef} />
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
                     </div>
 
-                    {/* Catalog Suggestions Area */}
-                    <AnimatePresence>
-                        {suggestedItems.length > 0 && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="bg-white border-t border-gray-100 z-10"
-                            >
-                                <CatalogSuggestions items={suggestedItems} onSelect={handleSelectCatalogItem} />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+
 
                     {/* Input Area */}
-                    <div className="p-4 bg-white border-t border-gray-100">
-                        <div className="relative flex items-end gap-2 max-w-4xl mx-auto">
-                            <textarea
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Type your request here..."
-                                className="flex-1 p-4 pr-12 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none min-h-[60px] max-h-[120px] shadow-inner text-gray-800 placeholder:text-gray-400"
-                                disabled={loading || isComplete}
-                            />
-                            <button
-                                onClick={handleSend}
-                                disabled={!input.trim() || loading || isComplete}
-                                className="absolute right-3 bottom-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg active:scale-95"
-                            >
-                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                            </button>
+                    <div className="p-4 bg-white border-t border-gray-200 z-10">
+                        <div className="max-w-3xl mx-auto">
+                            <div className="relative flex items-end gap-2">
+                                <textarea
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Type your request here..."
+                                    className="flex-1 p-4 pr-12 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none min-h-[56px] max-h-[120px] shadow-sm text-gray-800 placeholder:text-gray-400 text-sm leading-relaxed"
+                                    disabled={loading || isComplete}
+                                />
+                                <button
+                                    onClick={handleSend}
+                                    disabled={!input.trim() || loading || isComplete}
+                                    className="absolute right-3 bottom-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+                                >
+                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                </button>
+                            </div>
+                            <p className="text-center text-[10px] text-gray-400 mt-2">
+                                AI can make mistakes. Please review the details before submitting.
+                            </p>
                         </div>
-                        <p className="text-center text-xs text-gray-400 mt-2">
-                            AI can make mistakes. Please review the details before submitting.
-                        </p>
                     </div>
                 </div>
 
@@ -435,7 +620,7 @@ export default function AIChatIntake() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
