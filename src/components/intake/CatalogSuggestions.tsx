@@ -43,7 +43,7 @@ export default function CatalogSuggestions({ items, onSelect }: CatalogSuggestio
 
     return (
         <div className="mt-2">
-            <div className="flex gap-3 overflow-x-auto pb-4 pt-1 px-1 snap-x scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+            <div className="flex gap-3 overflow-x-auto pb-4 pt-5 px-1 snap-x scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {items.map((item) => {
                     const isSME = item.supplier?.supplierType === "SME";
                     const isExpanded = expandedIds.has(item.id);
